@@ -1,6 +1,6 @@
 {
   "name": "SMM Panel Admin Arayüzü",
-  "description": "Modern, professional SMM (Social Media Marketing) Panel Administrator dashboard with live stats, ticket support chat, orders pipeline, user balances ledger, and API diagnostics. Built in React, Vite, and Tailwind CSS.",
+  "description": "Modern, professional SMM Panel with a sleek sales Landing Page, fully loaded interactive Client Panel to place orders & deposit funds, and a robust Admin Console for live stats, ticket replies, and reseller API endpoints. Built in React, Vite, and Tailwind CSS.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

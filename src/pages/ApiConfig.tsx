@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppState } from '../context/AppContext';
 import { ApiProvider } from '../data/mockData';
-import { Shield, Key, Copy, Check, Trash2, Globe, Sparkles, RefreshCw, Sliders, Play } from 'lucide-react';
+import { Shield, Key, Copy, Check, Trash2, Globe, Sparkles, RefreshCw, Sliders, Play, Edit2, Save, X } from 'lucide-react';
 
 export const ApiConfig: React.FC = () => {
   const { 
@@ -9,6 +9,7 @@ export const ApiConfig: React.FC = () => {
     setApiProviders, 
     currentLanguage, 
     updateApiProviderStatus, 
+    updateApiProvider,
     testApiProvider, 
     showToast 
   } = useAppState();
@@ -17,8 +18,34 @@ export const ApiConfig: React.FC = () => {
   const [copiedKey, setCopiedKey] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
 
+  // API Provider Inline Editing states
+  const [editingProviderId, setEditingProviderId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editUrl, setEditUrl] = useState('');
+  const [editKey, setEditKey] = useState('');
+
   // Rate limits setting
   const [rateLimit, setRateLimit] = useState(120);
+
+  const startEditing = (p: ApiProvider) => {
+    setEditingProviderId(p.id);
+    setEditName(p.name);
+    setEditUrl(p.url);
+    setEditKey(p.key);
+  };
+
+  const cancelEditing = () => {
+    setEditingProviderId(null);
+  };
+
+  const handleSaveProvider = (id: string) => {
+    if (!editName.trim() || !editUrl.trim() || !editKey.trim()) {
+      showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurunuz.' : 'Please fill all fields.', 'error');
+      return;
+    }
+    updateApiProvider(id, editName, editUrl, editKey);
+    setEditingProviderId(null);
+  };
 
   const handleCreateNewAdminApiKey = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -102,49 +129,127 @@ export const ApiConfig: React.FC = () => {
         </h3>
 
         <div className="space-y-4">
-          {apiProviders.map(provider => (
-            <div 
-              id={`provider-card-item-${provider.id}`}
-              key={provider.id} 
-              className="p-4 bg-[#121226]/60 border border-white/5 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 transition hover:border-cyan-400/20"
-            >
-              <div className="space-y-2 flex-1 min-w-0">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full shadow-md" />
-                  <h4 className="text-xs font-black text-white">{provider.name}</h4>
-                  <span className="text-[10px] bg-purple-950/40 text-purple-400 border border-purple-800/20 px-2 py-0.5 rounded-lg font-mono font-bold">API_KEY ENCRYPTED</span>
+          {apiProviders.map(provider => {
+            const isEditing = editingProviderId === provider.id;
+            return isEditing ? (
+              <div 
+                id={`provider-card-edit-${provider.id}`}
+                key={provider.id} 
+                className="p-5 bg-[#0f0f20]/90 border border-cyan-400/30 rounded-2xl space-y-4 animate-fade-in"
+              >
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <span className="text-[10px] font-bold text-cyan-400 font-mono tracking-wider flex items-center gap-1.5 uppercase">
+                    <Sparkles className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
+                    <span>{currentLanguage === 'TR' ? 'API BAĞLANTISINI DÜZENLE' : 'EDIT API CONNECTION'}</span>
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-gray-500 bg-gray-950/40 px-2 py-0.5 rounded border border-white/5">{provider.id}</span>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400">{currentLanguage === 'TR' ? 'Sağlayıcı Adı (İsim)' : 'Provider Name'}</label>
+                    <input
+                      type="text"
+                      className="w-full bg-[#121226] border border-white/10 rounded-xl px-3-4 py-2.5 text-xs font-bold text-white focus:outline-none focus:border-cyan-500 transition"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400">{currentLanguage === 'TR' ? 'API Endpoint URL' : 'API Endpoint URL'}</label>
+                    <input
+                      type="text"
+                      className="w-full bg-[#121226] border border-white/10 rounded-xl px-3-4 py-2.5 text-xs font-mono font-bold text-gray-300 focus:outline-none focus:border-cyan-500 transition"
+                      value={editUrl}
+                      onChange={(e) => setEditUrl(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-gray-400">{currentLanguage === 'TR' ? 'API Key (Token)' : 'API Key'}</label>
+                    <input
+                      type="text"
+                      className="w-full bg-[#121226] border border-white/10 rounded-xl px-3-4 py-2.5 text-xs font-mono font-bold text-yellow-400 focus:outline-none focus:border-yellow-400 transition"
+                      placeholder="Pasted SMM Key"
+                      value={editKey}
+                      onChange={(e) => setEditKey(e.target.value)}
+                    />
+                  </div>
                 </div>
 
-                <p className="text-[11px] text-gray-500 font-medium truncate">API URL: <span className="font-semibold text-gray-300 font-mono select-all">{provider.url}</span></p>
-                <p className="text-[10px] text-gray-400">
-                  Mevcut Sağlayıcı Bakiyesi: <strong className="text-[#00D4FF] font-mono">{provider.balance !== undefined ? `${provider.balance.toFixed(2)} ₺` : 'N/A'}</strong>
-                </p>
+                <div className="flex justify-end gap-2.5 pt-2 border-t border-white/5">
+                  <button
+                    onClick={cancelEditing}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 text-[11px] font-bold rounded-xl cursor-pointer flex items-center gap-1.5 transition active:scale-95"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>{currentLanguage === 'TR' ? 'İptal' : 'Cancel'}</span>
+                  </button>
+                  <button
+                    onClick={() => handleSaveProvider(provider.id)}
+                    className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-500 text-white text-[11px] font-bold rounded-xl shadow cursor-pointer flex items-center gap-1.5 transition active:scale-95"
+                  >
+                    <Save className="w-3.5 h-3.5" />
+                    <span>{currentLanguage === 'TR' ? 'Kaydet' : 'Save'}</span>
+                  </button>
+                </div>
               </div>
+            ) : (
+              <div 
+                id={`provider-card-item-${provider.id}`}
+                key={provider.id} 
+                className="p-4 bg-[#121226]/60 border border-white/5 rounded-2xl flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 transition hover:border-cyan-400/20"
+              >
+                <div className="space-y-2 flex-1 min-w-0">
+                  <div className="flex items-center gap-2.5">
+                    <span className={`w-2.5 h-2.5 rounded-full shadow-md ${provider.status ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    <h4 className="text-xs font-black text-white">{provider.name}</h4>
+                    <span className="text-[10px] bg-purple-950/40 text-purple-400 border border-purple-800/20 px-2 py-0.5 rounded-lg font-mono font-bold">
+                      {provider.id === 'API_TURKPANELI' ? '⚡ TURK_PANELI_SYSTEM' : 'API_KEY SAVED'}
+                    </span>
+                  </div>
 
-              {/* Status toggle & Test triggers */}
-              <div className="flex items-center gap-4 justify-between w-full lg:w-auto border-t lg:border-none border-white/5 pt-3 lg:pt-0">
-                {/* Status selector toggle switch */}
-                <button
-                  id={`toggle-provider-status-switch-${provider.id}`}
-                  onClick={() => updateApiProviderStatus(provider.id, !provider.status)}
-                  className={`w-11 h-6 rounded-full p-0.5 transition-colors relative cursor-pointer ${provider.status ? 'bg-[#00D4FF]' : 'bg-[#1e1e32]'}`}
-                >
-                  <div className={`w-5 h-5 rounded-full bg-white transition-transform ${provider.status ? 'translate-x-5' : 'translate-x-0'}`} />
-                </button>
+                  <p className="text-[11px] text-gray-500 font-medium truncate">API URL: <span className="font-semibold text-gray-300 font-mono select-all">{provider.url}</span></p>
+                  <p className="text-[10px] text-gray-400">
+                    {currentLanguage === 'TR' ? 'Mevcut Sağlayıcı Bakiyesi:' : 'Current Provider Balance:'} <strong className="text-[#00D4FF] font-mono">{provider.balance !== undefined ? `${provider.balance.toFixed(2)} ₺` : 'N/A'}</strong>
+                  </p>
+                </div>
 
-                <button
-                  id={`test-provider-connection-btn-${provider.id}`}
-                  onClick={() => handleRunDiagnosticTest(provider.id)}
-                  disabled={testingId === provider.id}
-                  className="px-4 py-2 bg-indigo-950/20 border border-indigo-800/30 text-indigo-400 hover:bg-indigo-950 hover:text-indigo-300 text-[10px] font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50"
-                >
-                  {testingId === provider.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
-                  <span>API Testini Çalıştır</span>
-                </button>
+                {/* Status toggle & Test triggers */}
+                <div className="flex items-center gap-3 justify-between w-full lg:w-auto border-t lg:border-none border-white/5 pt-3 lg:pt-0">
+                  
+                  {/* Edit credentials button */}
+                  <button
+                    onClick={() => startEditing(provider)}
+                    className="p-2 bg-cyan-950/40 hover:bg-cyan-900/60 border border-cyan-800/30 text-cyan-400 rounded-xl transition active:scale-95 cursor-pointer flex items-center gap-1 text-[10px] font-bold px-3 py-1.5"
+                    title={currentLanguage === 'TR' ? 'Sağlayıcıyı Düzenle' : 'Edit Provider'}
+                  >
+                    <Edit2 className="w-3 h-3" />
+                    <span>{currentLanguage === 'TR' ? 'Düzenle' : 'Edit'}</span>
+                  </button>
+
+                  {/* Status selector toggle switch */}
+                  <button
+                    id={`toggle-provider-status-switch-${provider.id}`}
+                    onClick={() => updateApiProviderStatus(provider.id, !provider.status)}
+                    className={`w-11 h-6 rounded-full p-0.5 transition-colors relative cursor-pointer ${provider.status ? 'bg-[#00D4FF]' : 'bg-[#1e1e32]'}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full bg-white transition-transform ${provider.status ? 'translate-x-5' : 'translate-x-0'}`} />
+                  </button>
+
+                  <button
+                    id={`test-provider-connection-btn-${provider.id}`}
+                    onClick={() => handleRunDiagnosticTest(provider.id)}
+                    disabled={testingId === provider.id}
+                    className="px-4 py-2 bg-indigo-950/20 border border-indigo-800/30 text-indigo-400 hover:bg-indigo-950 hover:text-indigo-300 text-[10px] font-bold rounded-xl flex items-center gap-1.5 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {testingId === provider.id ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5 fill-current" />}
+                    <span>{currentLanguage === 'TR' ? 'Test Et' : 'Test API'}</span>
+                  </button>
+                </div>
+
               </div>
-
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 

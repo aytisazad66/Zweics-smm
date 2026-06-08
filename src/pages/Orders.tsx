@@ -58,29 +58,6 @@ export const Orders: React.FC = () => {
     }
   };
 
-  // Bulk Operations
-  const handleBulkStatusChange = (status: Order['status']) => {
-    if (selectedOrderIds.length === 0) {
-      showToast(currentLanguage === 'TR' ? 'Lütfen önce sipariş seçiniz.' : 'Please select orders first.', 'error');
-      return;
-    }
-
-    setOrders(prev => prev.map(o => {
-      if (selectedOrderIds.includes(o.id)) {
-        return { 
-          ...o, 
-          status, 
-          logs: [...o.logs, { time: "Şimdi", text: `Toplu işlem: Durum '${status}' yapıldı.` }] 
-        };
-      }
-      return o;
-    }));
-
-    addNotification(`${selectedOrderIds.length} adet sipariş toplu olarak '${status}' durumuna alındı.`, "service");
-    showToast(currentLanguage === 'TR' ? `${selectedOrderIds.length} sipariş başarıyla güncellendi.` : `${selectedOrderIds.length} orders updated successfully.`, 'success');
-    setSelectedOrderIds([]);
-  };
-
   const handleBulkDelete = () => {
     if (selectedOrderIds.length === 0) return;
     setOrders(prev => prev.filter(o => !selectedOrderIds.includes(o.id)));
@@ -157,33 +134,18 @@ export const Orders: React.FC = () => {
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-[#00D4FF]" />
               <span className="text-xs font-bold text-gray-200">
-                {selectedOrderIds.length} {currentLanguage === 'TR' ? 'sipariş seçildi:' : 'orders checked:'}
+                {selectedOrderIds.length} {currentLanguage === 'TR' ? 'sipariş seçildi' : 'orders checked'}
+              </span>
+              <span className="text-[10px] text-cyan-400 font-mono font-bold bg-cyan-950/40 px-2 py-0.5 rounded-lg border border-cyan-500/10">
+                ⚡ {currentLanguage === 'TR' ? 'SMM API Otomasyonu' : 'SMM API Automation'}
               </span>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
               <button
-                id="bulk-set-tamamlandi"
-                onClick={() => handleBulkStatusChange('Tamamlandı')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-950/20 border border-emerald-800/30 text-emerald-400 hover:bg-emerald-900/40 text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
-              >
-                <Check className="w-3.5 h-3.5" />
-                <span>{currentLanguage === 'TR' ? 'Tamamlandı Yap' : 'Set Completed'}</span>
-              </button>
-
-              <button
-                id="bulk-set-iptal"
-                onClick={() => handleBulkStatusChange('İptal')}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-950/20 border border-red-800/30 text-red-400 hover:bg-red-900/40 text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
-              >
-                <Ban className="w-3.5 h-3.5" />
-                <span>{currentLanguage === 'TR' ? 'İptal Et / İade' : 'Cancel & Refund'}</span>
-              </button>
-
-              <button
                 id="bulk-delete"
                 onClick={handleBulkDelete}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-950/20 border border-gray-800/30 text-rose-400 hover:bg-rose-950/40 text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FF2E74]/15 border border-[#FF2E74]/30 text-[#FF2E74] hover:bg-[#FF2E74]/25 text-[10px] font-bold rounded-lg transition active:scale-95 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>{currentLanguage === 'TR' ? 'Sistemden Sil' : 'Delete'}</span>
@@ -247,26 +209,23 @@ export const Orders: React.FC = () => {
                       <td className="py-3.5 font-bold font-mono text-gray-300">{order.quantity.toLocaleString('tr-TR')}</td>
                       <td className="py-3.5 font-bold font-mono text-[#00D4FF]">{order.charge.toFixed(2)} ₺</td>
                       <td className="py-3.5">
-                        {/* Status Select dropdown */}
-                        <select
-                          id={`set-order-status-select-${order.id}`}
-                          className={`bg-[#121226]/80 text-[10px] font-bold px-2 py-1.5 rounded-xl border-none outline-none cursor-pointer ${
+                        <div className="flex flex-col items-start gap-1">
+                          <span className={`px-2.5 py-1 rounded-xl text-[10px] font-bold border ${
                             order.status === 'Tamamlandı' 
-                              ? 'text-emerald-400 bg-emerald-950/20' 
+                              ? 'bg-emerald-950/20 text-emerald-400 border-emerald-800/30 font-bold' 
                               : order.status === 'İşlemde' 
-                              ? 'text-yellow-400 bg-yellow-950/20' 
+                              ? 'bg-yellow-950/20 text-yellow-400 border-yellow-800/30 font-bold' 
                               : order.status === 'İptal' 
-                              ? 'text-red-400 bg-red-950/20' 
-                              : 'text-gray-400 bg-gray-950/20'
-                          }`}
-                          value={order.status}
-                          onChange={(e) => updateOrderStatus(order.id, e.target.value as Order['status'])}
-                        >
-                          <option value="Bekliyor">Bekliyor</option>
-                          <option value="İşlemde">İşlemde</option>
-                          <option value="Tamamlandı">Tamamlandı</option>
-                          <option value="İptal">İptal</option>
-                        </select>
+                              ? 'bg-red-950/20 text-red-400 border-red-800/30 font-bold' 
+                              : 'bg-gray-950/20 text-gray-400 border-gray-800/30 font-bold'
+                          }`}>
+                            {order.status}
+                          </span>
+                          <span className="text-[8px] text-cyan-400 font-mono font-bold flex items-center gap-0.5 mt-0.5 uppercase tracking-wide">
+                            <Sparkles className="w-2.5 h-2.5 text-cyan-400 animate-pulse shrink-0" />
+                            <span>{currentLanguage === 'TR' ? 'OTOMATİK API' : 'AUTO API'}</span>
+                          </span>
+                        </div>
                       </td>
                       <td className="py-3.5 pr-3 text-right">
                         <button
@@ -367,7 +326,7 @@ export const Orders: React.FC = () => {
                 <div className="p-3 bg-[#0d0d1e] border border-white/5 rounded-xl flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="font-semibold text-gray-300">GoldenSMM Global SMM API v2</span>
+                    <span className="font-semibold text-gray-300">TurkPaneli.com SMM Dağıtıcı API</span>
                   </div>
                   <span className="text-[10px] font-mono font-bold text-cyan-400 bg-cyan-950/20 px-2.5 py-1 rounded-lg">STATUS: SUCCESS</span>
                 </div>

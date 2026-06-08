@@ -640,28 +640,12 @@ export const initialTickets: Ticket[] = [
 
 export const initialApiProviders: ApiProvider[] = [
   {
-    id: "API_GOLD",
-    name: "GoldenSMM Global Provider",
-    url: "https://api.goldensmm.com/v2",
-    key: "sk_gold_91238a7d189f38f123a1a",
+    id: "API_TURKPANELI",
+    name: "TurkPaneli.com SMM Dağıtıcı API",
+    url: "https://turkpaneli.com/api/v2",
+    key: "sk_tp_8219x0fd83120ff9a3c",
     status: true,
-    balance: 450.25
-  },
-  {
-    id: "API_TURK",
-    name: "TürkSMM Bayi Servisleri API",
-    url: "https://api.turksmm.net/v1",
-    key: "tk_turk_88192a0bd83120ff9a7c",
-    status: true,
-    balance: 1250.00
-  },
-  {
-    id: "API_CHINESE",
-    name: "Cheapest Global Fans API (Bulk)",
-    url: "https://fansapi.xyz/api",
-    key: "cn_fans_22910ab3c8d103bf903da-19",
-    status: false,
-    balance: 0.00
+    balance: 5420.50
   }
 ];
 
