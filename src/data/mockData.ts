@@ -9,6 +9,8 @@ export interface Service {
   status: 'active' | 'passive';
   sortOrder: number;
   description: string;
+  providerServiceId?: number;
+  providerApiId?: string;
 }
 
 export interface Order {
@@ -82,6 +84,7 @@ export interface ApiProvider {
   key: string;
   status: boolean;
   balance?: number;
+  region: 'TR' | 'GLOBAL';
 }
 
 export const PLATFORMS = [
@@ -641,11 +644,21 @@ export const initialTickets: Ticket[] = [
 export const initialApiProviders: ApiProvider[] = [
   {
     id: "API_TURKPANELI",
-    name: "TurkPaneli.com SMM Dağıtıcı API",
+    name: "TurkPaneli.com - Türk Kullanıcılar",
     url: "https://turkpaneli.com/api/v2",
-    key: "sk_tp_8219x0fd83120ff9a3c",
+    key: "",
     status: true,
-    balance: 5420.50
+    balance: undefined,
+    region: "TR"
+  },
+  {
+    id: "API_RESELLERPROVIDER",
+    name: "ResellerProvider.com - Global Users",
+    url: "https://resellerprovider.com/api/v2",
+    key: "",
+    status: true,
+    balance: undefined,
+    region: "GLOBAL"
   }
 ];
 

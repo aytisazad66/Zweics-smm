@@ -29,6 +29,7 @@ interface AppContextProps {
   setIs2FAVerified: (val: boolean) => void;
   currentUserRole: 'Süper Admin' | 'Admin' | 'Moderatör';
   setCurrentUserRole: (role: 'Süper Admin' | 'Admin' | 'Moderatör') => void;
+  importServicesFromApi: (providerId: string) => Promise<number>;
   
   services: Service[];
   setServices: React.Dispatch<React.SetStateAction<Service[]>>;
@@ -147,10 +148,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (saved) {
       try {
         const parsed = JSON.parse(saved) as ApiProvider[];
-        const filtered = parsed.filter(p => p.id === 'API_TURKPANELI');
-        if (filtered.length > 0) {
-          return filtered;
-        }
+        const validIds = ['API_TURKPANELI', 'API_RESELLERPROVIDER'];
+        const filtered = parsed.filter(p => validIds.includes(p.id));
+        // Merge with defaults to ensure both providers always exist
+        const merged = initialApiProviders.map(def => {
+          const found = filtered.find(f => f.id === def.id);
+          return found ? { ...def, ...found } : def;
+        });
+        return merged;
       } catch (e) {
         // ignore fallback
       }
@@ -451,66 +456,171 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }));
   };
   
+  const buildProxyUrl = (targetUrl: string): string => {
+    const isReplit = window.location.hostname.includes('.replit') || window.location.hostname.includes('.repl.co');
+    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1');
+    if (isLocal || isReplit) {
+      return `/api-proxy.php?url=${encodeURIComponent(targetUrl)}`;
+    }
+    return `/api-proxy.php?url=${encodeURIComponent(targetUrl)}`;
+  };
+
+  const callProviderApi = async (provider: ApiProvider, params: Record<string, string>): Promise<any> => {
+    const proxyUrl = buildProxyUrl(provider.url);
+    const body = new URLSearchParams(params).toString();
+    const res = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    return JSON.parse(text);
+  };
+
   const testApiProvider = async (id: string): Promise<boolean> => {
     const provider = apiProviders.find(p => p.id === id);
     if (!provider) return false;
 
-    const isLocal = window.location.hostname === 'localhost' || window.location.hostname.includes('127.0.0.1');
-    const proxyUrl = isLocal ? '' : '/api-proxy.php';
-
-    try {
-      const params = new URLSearchParams();
-      params.append('key', provider.key);
-      params.append('action', 'balance');
-
-      let requestUrl = provider.url;
-      if (!isLocal) {
-        requestUrl = `${window.location.origin}${proxyUrl}?url=${encodeURIComponent(provider.url)}`;
-      }
-
-      const res = await fetch(requestUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: params.toString()
-      });
-
-      if (res.ok) {
-        const rawText = await res.text();
-        let payload: any = {};
-        try {
-          payload = JSON.parse(rawText);
-        } catch (e) {
-          throw new Error("Response is not JSON format");
-        }
-
-        if (payload && (payload.balance !== undefined || payload.balance_raw !== undefined)) {
-          const balanceVal = parseFloat(payload.balance || payload.balance_raw || "0");
-          setApiProviders(prev => prev.map(p => p.id === id ? { ...p, balance: balanceVal } : p));
-          showToast(currentLanguage === 'TR'
-            ? `⚡ ${provider.name} Bağlantısı Başarılı! Güncel Bakiye: ₺${balanceVal.toFixed(2)}`
-            : `⚡ ${provider.name} Connected! Current Balance: ₺${balanceVal.toFixed(2)}`, "success");
-          return true;
-        } else if (payload && payload.error) {
-          showToast(`SMM API ${currentLanguage === 'TR' ? 'Hatası' : 'Error'}: ${payload.error}`, "error");
-          return false;
-        }
-      }
-    } catch (err: any) {
-      console.log("Direct browser/cors fetch rejected, running interactive simulation: ", err);
+    if (!provider.key || provider.key.trim() === '') {
+      showToast(
+        currentLanguage === 'TR'
+          ? `${provider.name} için önce API Key giriniz!`
+          : `Please enter an API Key for ${provider.name} first!`,
+        "error"
+      );
+      return false;
     }
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const simulatedBalance = parseFloat((Math.random() * 4500 + 1000).toFixed(2));
-        setApiProviders(prev => prev.map(p => p.id === id ? { ...p, balance: simulatedBalance } : p));
-        showToast(currentLanguage === 'TR'
-          ? `✓ ${provider.name} Bașarıyla Test Edildi! (cPanel'de api-proxy.php üzerinden gerçek bakiye çekilecektir)`
-          : `✓ ${provider.name} Tested Successfully! (Real balance is fetched on cPanel via api-proxy.php)`, "info");
-        resolve(true);
-      }, 1000);
-    });
+    try {
+      const payload = await callProviderApi(provider, { key: provider.key, action: 'balance' });
+
+      if (payload && (payload.balance !== undefined || payload.balance_raw !== undefined)) {
+        const balanceVal = parseFloat(payload.balance ?? payload.balance_raw ?? "0");
+        setApiProviders(prev => prev.map(p => p.id === id ? { ...p, balance: balanceVal } : p));
+        showToast(
+          currentLanguage === 'TR'
+            ? `⚡ ${provider.name} Bağlantısı Başarılı! Bakiye: ${provider.region === 'TR' ? '₺' : '$'}${balanceVal.toFixed(2)}`
+            : `⚡ ${provider.name} Connected! Balance: ${provider.region === 'TR' ? '₺' : '$'}${balanceVal.toFixed(2)}`,
+          "success"
+        );
+        return true;
+      } else if (payload && payload.error) {
+        showToast(`API Hatası: ${payload.error}`, "error");
+        return false;
+      }
+    } catch (err: any) {
+      showToast(
+        currentLanguage === 'TR'
+          ? `Bağlantı hatası: ${err.message}. API Key ve URL'yi kontrol edin.`
+          : `Connection error: ${err.message}. Check your API Key and URL.`,
+        "error"
+      );
+    }
+    return false;
+  };
+
+  const detectPlatformFromName = (name: string, category: string): Service['platform'] => {
+    const combined = `${name} ${category}`.toLowerCase();
+    if (combined.includes('tiktok') || combined.includes('tik tok')) return 'TikTok';
+    if (combined.includes('youtube') || combined.includes('yt ')) return 'YouTube';
+    if (combined.includes('twitter') || combined.includes('tweet') || combined.includes(' x ')) return 'Twitter';
+    if (combined.includes('spotify')) return 'Spotify';
+    if (combined.includes('telegram')) return 'Telegram';
+    return 'Instagram';
+  };
+
+  const importServicesFromApi = async (providerId: string): Promise<number> => {
+    const provider = apiProviders.find(p => p.id === providerId);
+    if (!provider) return 0;
+
+    if (!provider.key || provider.key.trim() === '') {
+      showToast(
+        currentLanguage === 'TR'
+          ? `${provider.name} için önce API Key giriniz!`
+          : `Please enter an API Key for ${provider.name} first!`,
+        "error"
+      );
+      return 0;
+    }
+
+    try {
+      const payload = await callProviderApi(provider, { key: provider.key, action: 'services' });
+
+      if (!Array.isArray(payload)) {
+        const errMsg = payload?.error || (currentLanguage === 'TR' ? 'Geçersiz API yanıtı' : 'Invalid API response');
+        showToast(`API Hatası: ${errMsg}`, "error");
+        return 0;
+      }
+
+      let addedCount = 0;
+      const newServices: Service[] = [];
+
+      payload.forEach((item: any) => {
+        const serviceId = String(item.service ?? item.id ?? '');
+        const already = services.some(s => s.providerServiceId === Number(serviceId) && s.providerApiId === providerId);
+        if (already) return;
+
+        const name = String(item.name ?? '');
+        const category = String(item.category ?? item.type ?? 'Genel');
+        const rate = parseFloat(item.rate ?? '0');
+        const min = parseInt(item.min ?? '100', 10);
+        const max = parseInt(item.max ?? '10000', 10);
+        const platform = detectPlatformFromName(name, category);
+
+        const markup = provider.region === 'TR' ? 1.3 : 1.35;
+        const pricePer1000 = parseFloat((rate * markup).toFixed(2));
+
+        const newService: Service = {
+          id: `${providerId}_${serviceId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
+          name,
+          platform,
+          category,
+          min: isNaN(min) ? 100 : min,
+          max: isNaN(max) ? 10000 : max,
+          pricePer1000: isNaN(pricePer1000) ? 10 : pricePer1000,
+          status: 'active',
+          sortOrder: services.length + newServices.length + 1,
+          description: `${provider.region === 'TR' ? 'TurkPaneli' : 'ResellerProvider'} - ${category}`,
+          providerServiceId: Number(serviceId),
+          providerApiId: providerId
+        };
+        newServices.push(newService);
+        addedCount++;
+      });
+
+      if (addedCount > 0) {
+        setServices(prev => [...prev, ...newServices]);
+        addNotification(
+          currentLanguage === 'TR'
+            ? `${provider.name} kaynağından ${addedCount} yeni servis aktarıldı.`
+            : `${addedCount} services imported from ${provider.name}.`,
+          "service"
+        );
+        showToast(
+          currentLanguage === 'TR'
+            ? `✅ ${addedCount} servis başarıyla içe aktarıldı!`
+            : `✅ ${addedCount} services imported successfully!`,
+          "success"
+        );
+      } else {
+        showToast(
+          currentLanguage === 'TR'
+            ? 'Tüm servisler zaten mevcut, yeni servis eklenmedi.'
+            : 'All services already imported. Nothing new to add.',
+          "info"
+        );
+      }
+      return addedCount;
+    } catch (err: any) {
+      showToast(
+        currentLanguage === 'TR'
+          ? `Servis çekme hatası: ${err.message}`
+          : `Import error: ${err.message}`,
+        "error"
+      );
+      return 0;
+    }
   };
 
   const registerClient = (fullName: string, email: string): boolean => {
@@ -760,7 +870,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleServiceStatus, addService, updateService, deleteService, reorderServices,
       replyTicket, toggleTicketStatus,
       approvePaymentRequest, rejectPaymentRequest, togglePaymentMethod, updatePaymentMethodCommission,
-      updateApiProviderStatus, updateApiProvider, testApiProvider,
+      updateApiProviderStatus, updateApiProvider, testApiProvider, importServicesFromApi,
       toastMsg, showToast,
 
       // Expose newly created client variables and methods
