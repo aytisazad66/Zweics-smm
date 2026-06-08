@@ -26,6 +26,8 @@ export interface Order {
   date: string;
   link: string;
   logs: { time: string; text: string }[];
+  providerOrderId?: string;
+  providerApiId?: string;
 }
 
 export interface User {

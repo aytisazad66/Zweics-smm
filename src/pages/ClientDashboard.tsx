@@ -171,7 +171,7 @@ export const ClientDashboard: React.FC = () => {
   }, [clientOrders]);
 
   // Simulation handlers
-  const handlePlaceOrderSubmit = (e: React.FormEvent) => {
+  const handlePlaceOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedServiceId || orderQuantity <= 0 || !orderLink) {
       showToast(currentLanguage === 'TR' ? 'Lütfen form alanlarını eksiksiz doldurun.' : 'Please fully fill in form components.', 'error');
@@ -187,12 +187,12 @@ export const ClientDashboard: React.FC = () => {
       return;
     }
 
-    const success = placeClientOrder(selectedServiceId, orderQuantity, orderLink, orderUsername);
+    const success = await placeClientOrder(selectedServiceId, orderQuantity, orderLink, orderUsername);
     if (success) {
       setOrderLink('');
       setOrderUsername('');
       setActiveTab('my-orders');
-      setExpandedOrderId(orders[0]?.id || null); // auto expand newest
+      setExpandedOrderId(orders[0]?.id || null);
     }
   };
 
@@ -245,7 +245,7 @@ export const ClientDashboard: React.FC = () => {
   const executeSimulatedApi = () => {
     setApiResponseLoading(true);
     setApiPlaygroundResponse(null);
-    setTimeout(() => {
+    setTimeout(async () => {
       setApiResponseLoading(false);
       const randomSuccessToken = `usr_sig_token_p_${Math.random().toString(36).substring(4, 12)}_${currentClientUser?.id || '90'}`;
       
@@ -287,15 +287,19 @@ export const ClientDashboard: React.FC = () => {
             current_balance: `${currentClientUser.balance} TRY`
           });
         } else {
-          // Place real simulated order block
-          placeClientOrder(pService.id, apiPlaygroundQuantity, apiPlaygroundOrderLink, "API_Automated_User");
-          setApiPlaygroundResponse({
+          // Place real order via provider API
+          const orderSuccess = await placeClientOrder(pService.id, apiPlaygroundQuantity, apiPlaygroundOrderLink, "API_Automated_User");
+          setApiPlaygroundResponse(orderSuccess ? {
             status: "success",
             order_id: "ORD-" + Math.floor(Math.random() * 89999 + 10000),
-            provider_reference: "API_ROUTER_TURKSMM_99182",
+            provider_reference: "API_ROUTER_TURKSMM_AUTO",
             computed_charge: `${computedCharge} TRY`,
-            message: "Sipariş API tarafından başarıyla alındı. Dağıtıcı kuyruğunda işlem hızı hızlandırıldı.",
+            message: "Sipariş sağlayıcıya iletildi.",
             sandbox_mode: false
+          } : {
+            status: "error",
+            error_code: "PROVIDER_REJECTED",
+            message: "Sağlayıcı siparişi reddetti. Sipariş iptal edildi ve bakiye iade edildi.",
           });
         }
       }

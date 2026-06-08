@@ -98,7 +98,7 @@ interface AppContextProps {
   clientLoggedIn: boolean;
   setClientLoggedIn: (val: boolean) => void;
   registerClient: (fullName: string, email: string) => boolean;
-  placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => boolean;
+  placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<boolean>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
 }
@@ -647,7 +647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const placeClientOrder = (serviceId: string, quantity: number, link: string, username: string): boolean => {
+  const placeClientOrder = async (serviceId: string, quantity: number, link: string, username: string): Promise<boolean> => {
     if (!currentClientUser) {
       showToast(currentLanguage === 'TR' ? 'Lütfen giriş yapın.' : 'Please log in.', 'error');
       return false;
@@ -659,20 +659,115 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     const cost = parseFloat(((service.pricePer1000 * quantity) / 1000).toFixed(2));
     if (currentClientUser.balance < cost) {
-      showToast(currentLanguage === 'TR' ? `Yetersiz bakiye! Bu sipariş ${cost} TL tutuyor, mevcut bakiyeniz ${currentClientUser.balance} TL.` : `Insufficient funds! This costs ${cost} TL, your balance is ${currentClientUser.balance} TL.`, 'error');
+      showToast(
+        currentLanguage === 'TR'
+          ? `Yetersiz bakiye! Bu sipariş ${cost} TL tutuyor, mevcut bakiyeniz ${currentClientUser.balance} TL.`
+          : `Insufficient funds! This costs ${cost} TL, your balance is ${currentClientUser.balance} TL.`,
+        'error'
+      );
       return false;
     }
 
+    const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    const nowDate = new Date().toLocaleDateString('tr-TR') + ' ' + nowTime;
+    const newOrderId = "ORD-" + Math.floor(Math.random() * 89999 + 10000);
+
+    // Deduct balance immediately and create order in "Bekliyor" state
+    let updatedUser = currentClientUser;
     setUsers(prev => prev.map(u => {
       if (u.id === currentClientUser.id) {
         const updated = { ...u, balance: parseFloat((u.balance - cost).toFixed(2)), totalOrders: u.totalOrders + 1 };
+        updatedUser = updated;
         setCurrentClientUser(updated);
         return updated;
       }
       return u;
     }));
 
-    const newOrderId = "ORD-" + Math.floor(Math.random() * 89999 + 10000);
+    const orderLogs: Order['logs'] = [
+      { time: nowTime, text: 'Sipariş alındı, bakiye tahsil edildi.' }
+    ];
+
+    // If service has a provider, send the order to the real API
+    let providerOrderId: string | undefined;
+    let providerApiId: string | undefined;
+    let finalStatus: Order['status'] = 'Bekliyor';
+
+    if (service.providerServiceId && service.providerApiId) {
+      const provider = apiProviders.find(p => p.id === service.providerApiId && p.isActive && p.key && p.key.trim() !== '');
+      if (provider) {
+        orderLogs.push({ time: nowTime, text: `Sağlayıcıya gönderiliyor: ${provider.name}...` });
+        try {
+          const apiResult = await callProviderApi(provider, {
+            key: provider.key,
+            action: 'add',
+            service: String(service.providerServiceId),
+            link,
+            quantity: String(quantity),
+          });
+
+          if (apiResult && apiResult.order) {
+            // Success: provider accepted the order
+            providerOrderId = String(apiResult.order);
+            providerApiId = provider.id;
+            finalStatus = 'İşlemde';
+            orderLogs.push({ time: nowTime, text: `✅ Sağlayıcı siparişi kabul etti. Sağlayıcı Sipariş ID: ${providerOrderId}` });
+          } else if (apiResult && apiResult.error) {
+            // Provider returned an error — refund and cancel
+            orderLogs.push({ time: nowTime, text: `❌ Sağlayıcı hatası: ${apiResult.error} — Bakiye iade edildi.` });
+            finalStatus = 'İptal';
+            // Refund the user
+            setUsers(prev => prev.map(u => {
+              if (u.id === currentClientUser.id) {
+                const refunded = { ...u, balance: parseFloat((u.balance + cost).toFixed(2)), totalOrders: u.totalOrders - 1 };
+                setCurrentClientUser(refunded);
+                return refunded;
+              }
+              return u;
+            }));
+            showToast(
+              currentLanguage === 'TR'
+                ? `Sipariş başarısız: ${apiResult.error}. Bakiyeniz iade edildi.`
+                : `Order failed: ${apiResult.error}. Your balance has been refunded.`,
+              'error'
+            );
+            const cancelledOrder: Order = {
+              id: newOrderId,
+              username: username || currentClientUser.fullName,
+              userId: currentClientUser.id,
+              serviceId: service.id,
+              serviceName: service.name,
+              platform: service.platform,
+              quantity,
+              charge: cost,
+              status: 'İptal',
+              date: nowDate,
+              link,
+              logs: orderLogs,
+            };
+            setOrders(prev => [cancelledOrder, ...prev]);
+            addNotification(`Sipariş başarısız (sağlayıcı hatası): ${service.name.substring(0, 20)}`, 'error');
+            return false;
+          } else {
+            // Unexpected response — keep as Bekliyor, admin will handle
+            orderLogs.push({ time: nowTime, text: `⚠️ Sağlayıcıdan beklenmeyen yanıt. Sipariş manuel incelemede.` });
+            finalStatus = 'Bekliyor';
+          }
+        } catch (err: any) {
+          // Network/proxy error — keep as Bekliyor, admin will handle
+          orderLogs.push({ time: nowTime, text: `⚠️ Sağlayıcıya bağlanılamadı: ${err.message}. Sipariş manuel incelemede.` });
+          finalStatus = 'Bekliyor';
+        }
+      } else {
+        orderLogs.push({ time: nowTime, text: '⚠️ Sağlayıcı aktif değil veya API Key girilmemiş. Sipariş manuel işleme alındı.' });
+        finalStatus = 'Bekliyor';
+      }
+    } else {
+      // No provider linked — manual order
+      orderLogs.push({ time: nowTime, text: 'Sağlayıcı bağlantısı yok, sipariş manuel işleme alındı.' });
+      finalStatus = 'Bekliyor';
+    }
+
     const newOrder: Order = {
       id: newOrderId,
       username: username || currentClientUser.fullName,
@@ -682,17 +777,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       platform: service.platform,
       quantity,
       charge: cost,
-      status: 'Bekliyor' as const,
-      date: new Date().toLocaleDateString('tr-TR') + ' ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+      status: finalStatus,
+      date: nowDate,
       link,
-      logs: [
-        { time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), text: 'Sipariş kullanıcı tarafından girildi, bakiye tahsil edildi.' }
-      ]
+      logs: orderLogs,
+      providerOrderId,
+      providerApiId,
     };
 
     setOrders(prev => [newOrder, ...prev]);
-    addNotification(`Yeni Bayi Siparişi: ${currentClientUser.fullName} - ${service.name.substring(0, 20)}...`, 'info');
-    showToast(currentLanguage === 'TR' ? `Sipariş başarıyla alındı! Sipariş ID: ${newOrderId}` : `Order placed! ID: ${newOrderId}`, 'success');
+    addNotification(`Yeni Sipariş: ${currentClientUser.fullName} - ${service.name.substring(0, 20)}...`, 'info');
+
+    if (finalStatus === 'İşlemde') {
+      showToast(
+        currentLanguage === 'TR'
+          ? `✅ Sipariş sağlayıcıya iletildi! ID: ${newOrderId} | Sağlayıcı ID: ${providerOrderId}`
+          : `✅ Order sent to provider! ID: ${newOrderId} | Provider ID: ${providerOrderId}`,
+        'success'
+      );
+    } else {
+      showToast(
+        currentLanguage === 'TR'
+          ? `Sipariş alındı! ID: ${newOrderId} (Manuel işlem kuyruğuna alındı)`
+          : `Order received! ID: ${newOrderId} (Added to manual processing queue)`,
+        'info'
+      );
+    }
     return true;
   };
 
