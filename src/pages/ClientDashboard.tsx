@@ -37,7 +37,10 @@ import {
   ArrowUpRight,
   Menu,
   X,
-  Home
+  Home,
+  Copy,
+  ClipboardCheck,
+  BanknoteIcon
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -76,6 +79,8 @@ export const ClientDashboard: React.FC = () => {
   // Add Funds States
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>(paymentMethods[0]?.id || '1');
   const [depositAmount, setDepositAmount] = useState<string>('150');
+  const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string } | null>(null);
+  const [copiedInstructions, setCopiedInstructions] = useState(false);
 
   // Support Tickets States
   const [ticketSubject, setTicketSubject] = useState<string>('');
@@ -203,8 +208,14 @@ export const ClientDashboard: React.FC = () => {
       showToast(currentLanguage === 'TR' ? 'Minimum yükleme tutarı 10 TL’dir.' : 'Minimum deposit limit is 10 TRY.', 'error');
       return;
     }
+    const method = paymentMethods.find(m => m.id === selectedPaymentMethodId);
     submitClientPaymentRequest(val, selectedPaymentMethodId);
     setDepositAmount('150');
+    setDepositConfirm({
+      amount: val,
+      methodName: method?.name || selectedPaymentMethodId,
+      instructions: method?.instructions || '',
+    });
   };
 
   const handleTicketSubmit = (e: React.FormEvent) => {
@@ -323,6 +334,7 @@ export const ClientDashboard: React.FC = () => {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-[#090918] text-[#e0e0ff] font-sans antialiased relative selection:bg-cyan-500/30 selection:text-white pb-20 lg:pb-0">
       
       {/* 1. Mobile Sidebar Drawer Overlay & Container */}
@@ -1421,8 +1433,8 @@ export const ClientDashboard: React.FC = () => {
                     type="submit"
                     className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-600 text-white hover:text-black font-extrabold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    <DollarSign className="w-4 h-4 text-slate-100" />
-                    <span>{currentLanguage === 'TR' ? 'Güvenli Ödeme Sayfasına Geç ve Bildirim Gönder' : 'Pay via Secure Gateway'}</span>
+                    <BanknoteIcon className="w-4 h-4 text-slate-100" />
+                    <span>{currentLanguage === 'TR' ? 'Ödeme Talebi Oluştur' : 'Create Payment Request'}</span>
                   </button>
 
                 </form>
@@ -1868,5 +1880,90 @@ export const ClientDashboard: React.FC = () => {
       </div>
 
     </div>
+
+    {/* DEPOSIT CONFIRMATION MODAL */}
+    
+    {depositConfirm && (
+      <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-[#121226] border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
+          
+          <div className="p-5 bg-[#171734] border-b border-white/10 flex items-center justify-between">
+            <h4 className="text-sm font-bold text-white flex items-center gap-2">
+              <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
+              <span>{currentLanguage === 'TR' ? 'Ödeme Talebi Oluşturuldu' : 'Payment Request Created'}</span>
+            </h4>
+            <button onClick={() => setDepositConfirm(null)} className="p-1 hover:bg-white/5 rounded text-gray-500 cursor-pointer">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-4 text-sm">
+
+            {/* Amount summary */}
+            <div className="flex items-center justify-between p-4 bg-emerald-950/30 border border-emerald-500/20 rounded-2xl">
+              <div>
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider mb-1">
+                  {currentLanguage === 'TR' ? 'Yatırılacak Tutar' : 'Amount to Deposit'}
+                </p>
+                <p className="text-2xl font-black text-white font-mono">₺{depositConfirm.amount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+                  {currentLanguage === 'TR' ? 'Yöntem' : 'Method'}
+                </p>
+                <p className="font-bold text-cyan-400">{depositConfirm.methodName}</p>
+              </div>
+            </div>
+
+            {/* Payment instructions */}
+            {depositConfirm.instructions ? (
+              <div className="space-y-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <ClipboardCheck className="w-3.5 h-3.5 text-cyan-400" />
+                  {currentLanguage === 'TR' ? 'Ödeme Bilgileri — Buraya Gönderin' : 'Send Payment To'}
+                </p>
+                <div className="relative p-4 bg-[#0d0d1c] border border-cyan-500/20 rounded-2xl">
+                  <pre className="text-sm text-gray-200 whitespace-pre-wrap font-sans leading-relaxed pr-8">{depositConfirm.instructions}</pre>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(depositConfirm.instructions);
+                      setCopiedInstructions(true);
+                      setTimeout(() => setCopiedInstructions(false), 2500);
+                    }}
+                    className="absolute top-3 right-3 p-1.5 bg-white/5 hover:bg-white/10 rounded-lg transition cursor-pointer"
+                    title="Kopyala"
+                  >
+                    {copiedInstructions ? <CheckCircle className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-gray-400" />}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-4 bg-yellow-950/20 border border-yellow-500/20 rounded-2xl text-yellow-300 text-xs leading-relaxed">
+                {currentLanguage === 'TR'
+                  ? '⚠️ Bu ödeme yöntemi için henüz hesap bilgisi tanımlanmamış. Lütfen destek ekibiyle iletişime geçin.'
+                  : '⚠️ No account details set for this method yet. Please contact support.'}
+              </div>
+            )}
+
+            {/* Instruction note */}
+            <div className="p-3.5 bg-blue-950/20 border border-blue-500/15 rounded-2xl text-[11px] text-blue-300 leading-relaxed">
+              {currentLanguage === 'TR'
+                ? '📌 Yukarıdaki bilgilere tam tutarı (₺' + depositConfirm.amount.toFixed(2) + ') gönderin. Açıklama/not kısmına kullanıcı adınızı yazmayı unutmayın. Transfer sonrası ekibimiz bakiyenizi onaylayacaktır.'
+                : '📌 Send exactly ₺' + depositConfirm.amount.toFixed(2) + ' to the account above. Include your username in the description. Our team will approve your balance after verifying the transfer.'}
+            </div>
+
+            <button
+              onClick={() => setDepositConfirm(null)}
+              className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 font-bold text-white rounded-2xl active:scale-95 transition cursor-pointer"
+            >
+              {currentLanguage === 'TR' ? 'Tamam, Anladım' : 'Got it, I\'ll transfer now'}
+            </button>
+
+          </div>
+        </div>
+      </div>
+    )}
+
+    </>
   );
 };
