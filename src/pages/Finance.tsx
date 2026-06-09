@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppState } from '../context/AppContext';
 import { PaymentRequest, PaymentMethod } from '../data/mockData';
-import { CreditCard, Check, Ban, Settings, Sliders, DollarSign, TrendingUp, ArrowDownLeft, X, Wallet } from 'lucide-react';
+import { CreditCard, Check, Ban, Settings, Sliders, DollarSign, TrendingUp, ArrowDownLeft, X, Wallet, FileText } from 'lucide-react';
 
 export const Finance: React.FC = () => {
   const { 
@@ -11,27 +11,35 @@ export const Finance: React.FC = () => {
     approvePaymentRequest, 
     rejectPaymentRequest, 
     togglePaymentMethod, 
-    updatePaymentMethodCommission 
+    updatePaymentMethodCommission,
+    updatePaymentMethodDetails,
   } = useAppState();
 
   const [activeTab, setActiveTab] = useState<'claims' | 'gateways'>('claims');
   
-  // Commission editor helper states
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null);
-  const [commissionVal, setCommissionVal] = useState('');
+  const [editName, setEditName] = useState('');
+  const [editCommission, setEditCommission] = useState('');
+  const [editMinAmount, setEditMinAmount] = useState('');
+  const [editInstructions, setEditInstructions] = useState('');
 
-  // Calculations for earnings summary widgets
   const approvedClaims = paymentRequests.filter(r => r.status === 'Onaylandı');
   const todayClaims = approvedClaims.slice(0, 3).reduce((sum, r) => sum + r.amount, 0);
-  const totalApprovedTotal = approvedClaims.reduce((sum, r) => sum + r.amount, 0) + 12000; // base scale
+  const totalApprovedTotal = approvedClaims.reduce((sum, r) => sum + r.amount, 0) + 12000;
 
   const handleUpdateCommission = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMethod) return;
-    const rate = parseFloat(commissionVal);
-    if (isNaN(rate) || rate < 0) return;
+    const commission = parseFloat(editCommission);
+    const minAmount = parseFloat(editMinAmount);
+    if (isNaN(commission) || commission < 0) return;
 
-    updatePaymentMethodCommission(editingMethod.id, rate);
+    updatePaymentMethodDetails(editingMethod.id, {
+      name: editName.trim() || editingMethod.name,
+      commission: isNaN(commission) ? editingMethod.commission : commission,
+      minAmount: isNaN(minAmount) ? editingMethod.minAmount : minAmount,
+      instructions: editInstructions,
+    });
     setEditingMethod(null);
   };
 
@@ -174,7 +182,7 @@ export const Finance: React.FC = () => {
                 key={method.id} 
                 className="p-5 bg-[#121226]/60 border border-white/5 rounded-2xl flex items-start justify-between gap-4 transition hover:border-[#00D4FF]/20"
               >
-                <div className="space-y-1.5">
+                <div className="space-y-1.5 flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="p-2 bg-white/5 border border-white/10 rounded-xl text-gray-400">
                       <CreditCard className="w-4.5 h-4.5 text-[#00D4FF]" />
@@ -182,14 +190,20 @@ export const Finance: React.FC = () => {
                     <h4 className="text-sm font-bold text-white leading-tight">{method.name}</h4>
                   </div>
                   
-                  <div className="pt-3.5 space-y-1 text-gray-400">
-                    <p>Komisyon Oranı: <strong className="text-white font-mono">%{method.commission}%</strong></p>
-                    <p>Minimum Yükleme Sınırı: <strong className="text-white font-mono">{method.minAmount} TL</strong></p>
+                  <div className="pt-2 space-y-1 text-[11px] text-gray-400">
+                    <p>Komisyon: <strong className="text-white font-mono">%{method.commission}</strong> &nbsp;|&nbsp; Min: <strong className="text-white font-mono">{method.minAmount} ₺</strong></p>
+                    {method.instructions ? (
+                      <p className="text-cyan-400/80 truncate flex items-center gap-1">
+                        <FileText className="w-3 h-3 shrink-0" />
+                        <span className="truncate">{method.instructions}</span>
+                      </p>
+                    ) : (
+                      <p className="text-yellow-500/60 italic">Hesap bilgisi girilmemiş</p>
+                    )}
                   </div>
                 </div>
 
-                {/* Switcher and commission slider tools */}
-                <div className="flex flex-col items-end justify-between h-full gap-4">
+                <div className="flex flex-col items-end justify-between h-full gap-4 shrink-0">
                   <button
                     id={`toggle-payment-method-switch-${method.id}`}
                     onClick={() => togglePaymentMethod(method.id)}
@@ -202,12 +216,15 @@ export const Finance: React.FC = () => {
                     id={`edit-commission-btn-${method.id}`}
                     onClick={() => {
                       setEditingMethod(method);
-                      setCommissionVal(method.commission.toString());
+                      setEditName(method.name);
+                      setEditCommission(method.commission.toString());
+                      setEditMinAmount(method.minAmount.toString());
+                      setEditInstructions(method.instructions || '');
                     }}
                     className="p-1 px-2.5 bg-white/5 border border-white/10 text-xs font-bold text-[#00D4FF] hover:bg-white/10 rounded-lg flex items-center gap-1 cursor-pointer active:scale-95"
                   >
                     <Settings className="w-3.5 h-3.5" />
-                    <span>Oran Değiştir</span>
+                    <span>Düzenle</span>
                   </button>
                 </div>
               </div>
@@ -216,14 +233,14 @@ export const Finance: React.FC = () => {
         </div>
       )}
 
-      {/* COMMISSION SETTING MODAL */}
+      {/* PAYMENT METHOD EDIT MODAL */}
       {editingMethod && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-[#121226] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
+          <div className="w-full max-w-md bg-[#121226] border border-white/10 rounded-3xl overflow-hidden shadow-2xl animate-scale-up">
             <div className="p-5 bg-[#171734] border-b border-white/10 flex items-center justify-between">
               <h4 className="text-sm font-bold font-sora text-white flex items-center gap-2">
                 <Sliders className="w-4.5 h-4.5 text-cyan-400" />
-                <span>Yöntem Oran Konfigürasyonu</span>
+                <span>Ödeme Yöntemi Düzenle</span>
               </h4>
               <button onClick={() => setEditingMethod(null)} className="p-1 hover:bg-white/5 rounded text-gray-500 cursor-pointer">
                 <X className="w-5 h-5" />
@@ -231,24 +248,61 @@ export const Finance: React.FC = () => {
             </div>
 
             <form onSubmit={handleUpdateCommission} className="p-6 space-y-4 text-xs">
-              <div className="p-3 bg-[#0d0d1c] border border-white/5 rounded-xl block leading-snug">
-                Kanal: <strong className="text-white">{editingMethod.name}</strong>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Yöntem Adı</label>
+                <input
+                  type="text"
+                  required
+                  className="w-full bg-[#16162d] border border-white/10 rounded-xl py-3 px-4 text-sm text-white focus:outline-none focus:border-cyan-500/50"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="ör. Papara, Banka Havalesi..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Komisyon Oranı (%)</label>
+                  <div className="relative">
+                    <input
+                      id="edit-commission-rate-input"
+                      type="number"
+                      step="0.1"
+                      min="0"
+                      required
+                      className="w-full bg-[#16162d] border border-white/10 rounded-xl py-3 px-4 font-mono font-black text-white focus:outline-none focus:border-cyan-500/50"
+                      value={editCommission}
+                      onChange={(e) => setEditCommission(e.target.value)}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 font-bold text-gray-500 text-xs">%</span>
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Min. Yükleme (₺)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    className="w-full bg-[#16162d] border border-white/10 rounded-xl py-3 px-4 font-mono font-black text-white focus:outline-none focus:border-cyan-500/50"
+                    value={editMinAmount}
+                    onChange={(e) => setEditMinAmount(e.target.value)}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-[10px] font-bold text-gray-400 uppercase">Yeni Komisyon Oranı (%)</label>
-                <div className="relative">
-                  <input
-                    id="edit-commission-rate-input"
-                    type="number"
-                    step="0.1"
-                    required
-                    className="w-full bg-[#16162d] border border-white/10 rounded-xl py-3 px-4 font-mono font-black text-white"
-                    value={commissionVal}
-                    onChange={(e) => setCommissionVal(e.target.value)}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 font-bold text-gray-500">%</span>
-                </div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText className="w-3 h-3" />
+                  Hesap Bilgileri / Ödeme Talimatları
+                </label>
+                <textarea
+                  rows={4}
+                  className="w-full bg-[#16162d] border border-white/10 rounded-xl py-3 px-4 text-sm text-white resize-none focus:outline-none focus:border-cyan-500/50 leading-relaxed"
+                  value={editInstructions}
+                  onChange={(e) => setEditInstructions(e.target.value)}
+                  placeholder="ör. Papara No: 1234567890 — Ad Soyad: ...&#10;IBAN: TR00 0000 0000 0000 0000 00&#10;BTC Adresi: bc1q...&#10;&#10;Açıklama kısmına kullanıcı adınızı yazın."
+                />
+                <p className="text-[10px] text-gray-600">Bu bilgiler para yatırma formunda kullanıcıya gösterilir.</p>
               </div>
 
               <div className="pt-4 flex items-center justify-end gap-3 border-t border-white/5">
@@ -256,16 +310,16 @@ export const Finance: React.FC = () => {
                   id="cancel-edit-commission-btn"
                   type="button"
                   onClick={() => setEditingMethod(null)}
-                  className="px-4 py-2 rounded-xl border border-white/10 font-bold bg-[#171732] text-gray-300"
+                  className="px-4 py-2 rounded-xl border border-white/10 font-bold bg-[#171732] text-gray-300 cursor-pointer"
                 >
                   İptal
                 </button>
                 <button
                   id="submit-edit-commission-btn"
                   type="submit"
-                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-400 to-purple-600 font-bold text-white rounded-xl active:scale-95"
+                  className="px-5 py-2.5 bg-gradient-to-r from-cyan-400 to-purple-600 font-bold text-white rounded-xl active:scale-95 cursor-pointer"
                 >
-                  Güncelle
+                  Kaydet
                 </button>
               </div>
             </form>

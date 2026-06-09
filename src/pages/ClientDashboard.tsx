@@ -995,9 +995,9 @@ export const ClientDashboard: React.FC = () => {
                       {servicesOfPlatform.length === 0 ? (
                         <option value="">{currentLanguage === 'TR' ? 'Bu platformda aktif servis yok' : 'No active service available'}</option>
                       ) : (
-                        servicesOfPlatform.map(serv => (
+                        servicesOfPlatform.map((serv, idx) => (
                           <option key={serv.id} value={serv.id}>
-                            #{serv.id} - {serv.name} (₺{serv.pricePer1000.toFixed(2)} / 1000)
+                            #{idx + 1} - {serv.name} (₺{serv.pricePer1000.toFixed(2)} / 1000)
                           </option>
                         ))
                       )}
@@ -1362,7 +1362,7 @@ export const ClientDashboard: React.FC = () => {
                   
                   {/* Select Payment gateway */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Tüccar Ödeme Sınıfı' : 'Deposit Gateway'}</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Ödeme Yöntemi Seç' : 'Deposit Method'}</label>
                     <div className="grid grid-cols-1 gap-2">
                       {paymentMethods.map(m => (
                         <button
@@ -1377,14 +1377,26 @@ export const ClientDashboard: React.FC = () => {
                         >
                           <div>
                             <span className="block font-extrabold text-sm text-slate-100">{m.name}</span>
-                            <span className="text-[10px] text-gray-500 font-bold block uppercase mt-0.5">KOMİSYON: %{m.commission} • MİN YÜKLEME: {m.minAmount} TL</span>
+                            <span className="text-[10px] text-gray-500 font-bold block uppercase mt-0.5">
+                              {m.commission > 0 ? `KOMİSYON: %${m.commission} • ` : ''}MİN: {m.minAmount} ₺
+                            </span>
                           </div>
-                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center ${selectedPaymentMethodId === m.id ? 'border-cyan-400' : 'border-gray-700'}`}>
+                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 ${selectedPaymentMethodId === m.id ? 'border-cyan-400' : 'border-gray-700'}`}>
                             {selectedPaymentMethodId === m.id && <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />}
                           </div>
                         </button>
                       ))}
                     </div>
+                    {/* Payment instructions box — shown when method has instructions */}
+                    {(() => {
+                      const selMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
+                      return selMethod?.instructions ? (
+                        <div className="mt-2 p-4 bg-cyan-950/25 border border-cyan-500/20 rounded-2xl space-y-1.5">
+                          <p className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">{currentLanguage === 'TR' ? '📋 Ödeme Bilgileri' : '📋 Payment Details'}</p>
+                          <pre className="text-xs text-gray-300 whitespace-pre-wrap font-sans leading-relaxed">{selMethod.instructions}</pre>
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
 
                   {/* Amount to input */}

@@ -47,6 +47,7 @@ export interface PaymentMethod {
   status: boolean;
   commission: number;
   minAmount: number;
+  instructions?: string;
 }
 
 export interface PaymentRequest {
@@ -486,11 +487,10 @@ export const initialUsers: User[] = [
 ];
 
 export const initialPaymentMethods: PaymentMethod[] = [
-  { id: "cc", name: "Kredi / Banka Kartı (PayTR)", status: true, commission: 2.5, minAmount: 50 },
-  { id: "eft", name: "Havale / EFT (Manuel onay)", status: true, commission: 0, minAmount: 100 },
-  { id: "crypto", name: "Kripto Ödeme (BTC, ETH, USDT)", status: true, commission: 1.0, minAmount: 250 },
-  { id: "papara", name: "Papara ile Cüzdan Transferi", status: true, commission: 1.5, minAmount: 20 },
-  { id: "stripe", name: "Stripe Global Pay (USD/EUR)", status: false, commission: 3.9, minAmount: 200 }
+  { id: "papara", name: "Papara", status: true, commission: 0, minAmount: 20, instructions: "" },
+  { id: "eft", name: "Banka Havalesi / EFT", status: true, commission: 0, minAmount: 100, instructions: "" },
+  { id: "crypto", name: "Kripto (USDT / BTC / ETH)", status: true, commission: 0, minAmount: 250, instructions: "" },
+  { id: "other1", name: "Diğer Ödeme Yöntemi", status: false, commission: 0, minAmount: 50, instructions: "" },
 ];
 
 export const initialPaymentRequests: PaymentRequest[] = [

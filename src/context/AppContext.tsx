@@ -82,6 +82,7 @@ interface AppContextProps {
   rejectPaymentRequest: (requestId: string) => void;
   togglePaymentMethod: (id: string) => void;
   updatePaymentMethodCommission: (id: string, commission: number) => void;
+  updatePaymentMethodDetails: (id: string, updates: { name?: string; commission?: number; minAmount?: number; instructions?: string }) => void;
   
   updateApiProviderStatus: (id: string, status: boolean) => void;
   updateApiProvider: (id: string, name: string, url: string, key: string) => void;
@@ -430,6 +431,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (p.id === id) {
         showToast(`${p.name} komisyon oranı %${commission} yapıldı.`, "success");
         return { ...p, commission };
+      }
+      return p;
+    }));
+  };
+
+  const updatePaymentMethodDetails = (id: string, updates: { name?: string; commission?: number; minAmount?: number; instructions?: string }) => {
+    setPaymentMethods(prev => prev.map(p => {
+      if (p.id === id) {
+        showToast(`${p.name} ödeme yöntemi güncellendi.`, "success");
+        return { ...p, ...updates };
       }
       return p;
     }));
@@ -875,7 +886,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updateOrderStatus, addOrderLog,
       toggleServiceStatus, addService, updateService, deleteService, reorderServices,
       replyTicket, toggleTicketStatus,
-      approvePaymentRequest, rejectPaymentRequest, togglePaymentMethod, updatePaymentMethodCommission,
+      approvePaymentRequest, rejectPaymentRequest, togglePaymentMethod, updatePaymentMethodCommission, updatePaymentMethodDetails,
       updateApiProviderStatus, updateApiProvider, testApiProvider, importServicesFromApi,
       toastMsg, showToast,
 
