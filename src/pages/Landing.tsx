@@ -37,6 +37,8 @@ export const Landing: React.FC = () => {
   const [activePlatformFilter, setActivePlatformFilter] = useState<string>('Tümü');
   const [searchTerm, setSearchTerm] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
 
   // Authentication states (Modal)
   const [authModalOpen, setAuthModalOpen] = useState(false);
@@ -50,6 +52,7 @@ export const Landing: React.FC = () => {
   }, []);
 
   const filteredServices = useMemo(() => {
+    setCurrentPage(1);
     return services.filter(service => {
       if (service.status !== 'active') return false;
       const matchesPlatform = activePlatformFilter === 'Tümü' || service.platform === activePlatformFilter;
@@ -58,6 +61,12 @@ export const Landing: React.FC = () => {
       return matchesPlatform && matchesSearch;
     });
   }, [services, activePlatformFilter, searchTerm]);
+
+  const totalPages = Math.ceil(filteredServices.length / ITEMS_PER_PAGE);
+  const paginatedServices = filteredServices.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
 
   // Handle Client Authentication
   const handleAuthSubmit = (e: React.FormEvent) => {
@@ -73,13 +82,11 @@ export const Landing: React.FC = () => {
         setPortalMode('client');
       }
     } else {
-      // Login flow
       if (!authEmail || !authPassword) {
         showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurun.' : 'Please fill all fields.', 'error');
         return;
       }
-      
-      // Look for user in registered client list
+
       const user = users.find(u => u.email.toLowerCase() === authEmail.toLowerCase());
       if (user) {
         if (user.status === 'suspended') {
@@ -92,10 +99,8 @@ export const Landing: React.FC = () => {
         setAuthModalOpen(false);
         showToast(currentLanguage === 'TR' ? `Tekrar hoş geldiniz, Sayın ${user.fullName}!` : `Welcome back, Mr/Mrs ${user.fullName}!`, 'success');
       } else {
-        // Simple fallback to create user or log in with demo
         const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
         if (isDemo || authPassword === 'password123') {
-          // Find first active user or mock login
           const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
           setCurrentClientUser(targetUser);
           setClientLoggedIn(true);
@@ -118,7 +123,7 @@ export const Landing: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#090915] text-[#eeeeff] font-sans antialiased relative overflow-x-hidden">
-      
+
       {/* Dynamic Grid Background Overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#14142b_1px,transparent_1px),linear-gradient(to_bottom,#14142b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-35 pointer-events-none" />
 
@@ -130,7 +135,7 @@ export const Landing: React.FC = () => {
       {/* Premium Navigation Header */}
       <nav className="border-b border-white/5 bg-[#090915]/80 backdrop-blur-md sticky top-0 z-[1500] w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
+
           {/* Logo brand */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/15">
@@ -171,17 +176,6 @@ export const Landing: React.FC = () => {
             >
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
               <span>{currentLanguage}</span>
-            </button>
-
-            {/* Admin Console shortcut link */}
-            <button
-              onClick={() => {
-                setPortalMode('admin');
-                showToast(currentLanguage === 'TR' ? 'Yönetim portalına yönlendiriliyorsunuz.' : 'Redirecting to admin terminal.', 'info');
-              }}
-              className="text-xs font-bold text-gray-400 hover:text-white transition cursor-pointer"
-            >
-              {currentLanguage === 'TR' ? 'Yönetici Girişi' : 'Admin Console'}
             </button>
 
             <button
@@ -236,7 +230,7 @@ export const Landing: React.FC = () => {
             </a>
           </div>
 
-          <div className="flex items-center justify-between pt-3">
+          <div className="flex items-center justify-end pt-3">
             <button
               onClick={() => {
                 setCurrentLanguage(currentLanguage === 'TR' ? 'EN' : 'TR');
@@ -246,16 +240,6 @@ export const Landing: React.FC = () => {
             >
               <Globe className="w-3.5 h-3.5 text-cyan-400" />
               <span>{currentLanguage}</span>
-            </button>
-
-            <button
-              onClick={() => {
-                setPortalMode('admin');
-                setMobileMenuOpen(false);
-              }}
-              className="text-xs font-bold text-gray-400 hover:text-white cursor-pointer"
-            >
-              {currentLanguage === 'TR' ? 'Admin Paneli' : 'Admin Area'}
             </button>
           </div>
 
@@ -287,16 +271,15 @@ export const Landing: React.FC = () => {
       {/* Hero Content Section */}
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 lg:py-24 text-center space-y-12">
         <div className="space-y-4 max-w-4xl mx-auto">
-          {/* Badge indicator */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-cyan-950/40 border border-cyan-500/35 text-[10px] font-bold text-[#00D4FF] tracking-wider uppercase mx-auto animate-pulse">
             <Cpu className="w-3.5 h-3.5" />
-            <span>{currentLanguage === 'TR' ? 'OTOMATIK API GÖNDERIM ALTYAPISI' : 'AUTOMATED RESELLER API'}</span>
+            <span>{currentLanguage === 'TR' ? 'OTOMATIK GÖNDERIM ALTYAPISI' : 'AUTOMATED RESELLER API'}</span>
           </div>
 
           <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold font-sora text-white tracking-tight leading-tight">
             {currentLanguage === 'TR' ? (
               <>
-                Türkiye'nin En Ucuz, En Hızlı <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent">API SMM Servis</span> Sağlayıcısı
+                Türkiye'nin En Ucuz, En Hızlı <span className="bg-gradient-to-r from-cyan-400 to-purple-500 bg-clip-text text-transparent"> SMM Servisi</span> 
               </>
             ) : (
               <>
@@ -307,12 +290,11 @@ export const Landing: React.FC = () => {
 
           <p className="text-sm sm:text-base text-gray-400 leading-relaxed max-w-2xl mx-auto">
             {currentLanguage === 'TR' 
-              ? 'Instagram, TikTok, YouTube ve yüzlerce platformda anında gönderim sağlayan otomatik SMM servisleriyle sosyal medya etkileşimlerinizi uçuşa geçirin. Üye olarak ücretsiz test bakiyenizi anında kullanın!' 
+              ? 'Instagram, TikTok, YouTube ve yüzlerce platformda anında gönderim sağlayan otomatik SMM servisleriyle sosyal medya etkileşimlerinizi uçuşa geçirin. Üye olarak hemen denemeye başlayın!' 
               : 'Launch your social accounts to new heights using automated marketing api. Instantly get your free welcome load in your wallet upon secure signup!'}
           </p>
         </div>
 
-        {/* Action Call for Clients */}
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
           <button
             onClick={() => {
@@ -321,10 +303,10 @@ export const Landing: React.FC = () => {
             }}
             className="w-full sm:w-auto px-8 py-4 bg-gradient-to-r from-[#00D4FF] to-[#7B2FFF] text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:shadow-xl hover:shadow-cyan-400/20 active:scale-95 transition cursor-pointer"
           >
-            <span>{currentLanguage === 'TR' ? 'Ücretsiz Kayıt Ol & 100 TL Kap' : 'Register & Claim 100 TL Free'}</span>
+            <span>{currentLanguage === 'TR' ? 'Ücretsiz Kayıt Ol' : 'Register Free'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-          
+
           <button
             onClick={() => {
               setAuthTab('login');
@@ -336,11 +318,10 @@ export const Landing: React.FC = () => {
           </button>
         </div>
 
-        {/* Active Stats Panel */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 pt-8 max-w-5xl mx-auto">
           {[
-            { value: '48.9K+', labelTR: 'Aktif Bayiler', labelEN: 'Active Resellers', color: 'text-cyan-400' },
-            { value: '312.4M', labelTR: 'Tamamlanan Sipariş', labelEN: 'Orders Completed', color: 'text-purple-400' },
+            { value: '400+', labelTR: 'Aktif Bayiler', labelEN: 'Active Resellers', color: 'text-cyan-400' },
+            { value: '3.4M', labelTR: 'Tamamlanan Sipariş', labelEN: 'Orders Completed', color: 'text-purple-400' },
             { value: '0.04s', labelTR: 'Ortalama Başlama', labelEN: 'Avg Start Time', color: 'text-emerald-400' },
             { value: '99.98%', labelTR: 'UPTIME APis', labelEN: 'API Stability', color: 'text-pink-400' },
           ].map((stat, i) => (
@@ -353,7 +334,6 @@ export const Landing: React.FC = () => {
             </div>
           ))}
         </div>
-
       </section>
 
       {/* Interactive Catalog Section */}
@@ -369,9 +349,7 @@ export const Landing: React.FC = () => {
           </p>
         </div>
 
-        {/* Filters and search blocks */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-          {/* Horizontal scroll platform menu */}
           <div className="flex items-center gap-1.5 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-none">
             {platforms.map(p => (
               <button
@@ -388,7 +366,6 @@ export const Landing: React.FC = () => {
             ))}
           </div>
 
-          {/* Search bar */}
           <div className="relative w-full md:w-80 shrink-0">
             <Search className="w-4 h-4 text-gray-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
@@ -401,13 +378,11 @@ export const Landing: React.FC = () => {
           </div>
         </div>
 
-        {/* Services Table Card responsive markup */}
         <div className="bg-[#121226]/35 border border-white/5 rounded-3xl overflow-hidden backdrop-blur-md">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-[#191932]/35 border-b border-white/5 text-gray-500 font-bold uppercase tracking-wider">
-                  <th className="py-4 px-5">ID</th>
                   <th className="py-4 px-5">{currentLanguage === 'TR' ? 'Platform' : 'Platform'}</th>
                   <th className="py-4 px-5">{currentLanguage === 'TR' ? 'Servis Adı' : 'Service Description'}</th>
                   <th className="py-4 px-5 text-right">{currentLanguage === 'TR' ? 'Fiyat (1000 Adet)' : 'Cost per 1k'}</th>
@@ -419,14 +394,13 @@ export const Landing: React.FC = () => {
               <tbody className="divide-y divide-white/5 text-gray-300 font-medium">
                 {filteredServices.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-gray-500">
+                    <td colSpan={6} className="py-12 text-center text-gray-500">
                       {currentLanguage === 'TR' ? 'Aradığınız kriterlere uygun servis bulunamadı.' : 'No active services compile into your current filters.'}
                     </td>
                   </tr>
                 ) : (
-                  filteredServices.map(service => (
+                  paginatedServices.map(service => (
                     <tr key={service.id} className="hover:bg-white/2 transition">
-                      <td className="py-3.5 px-5 font-mono text-cyan-400 font-bold">#{service.id}</td>
                       <td className="py-3.5 px-5 select-none">
                         <span className={`px-2 py-1 rounded-md text-[10px] font-extrabold font-mono uppercase tracking-wider ${
                           service.platform === 'Instagram' ? 'bg-pink-950/20 text-pink-400 border border-pink-500/10' :
@@ -465,12 +439,66 @@ export const Landing: React.FC = () => {
             </table>
           </div>
         </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-4 py-2 text-xs font-bold bg-[#121226]/60 border border-white/10 rounded-xl text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+            >
+              {currentLanguage === 'TR' ? '← Önceki' : '← Prev'}
+            </button>
+
+            <div className="flex items-center gap-1.5">
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                  if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push('...');
+                  acc.push(p);
+                  return acc;
+                }, [])
+                .map((p, idx) =>
+                  p === '...' ? (
+                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-600 text-xs">…</span>
+                  ) : (
+                    <button
+                      key={p}
+                      onClick={() => setCurrentPage(p as number)}
+                      className={`w-8 h-8 rounded-xl text-xs font-bold transition cursor-pointer ${
+                        currentPage === p
+                          ? 'bg-gradient-to-r from-cyan-400 to-purple-500 text-white'
+                          : 'bg-[#121226]/60 border border-white/10 text-gray-400 hover:text-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  )
+                )}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-4 py-2 text-xs font-bold bg-[#121226]/60 border border-white/10 rounded-xl text-gray-400 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+            >
+              {currentLanguage === 'TR' ? 'Sonraki →' : 'Next →'}
+            </button>
+          </div>
+        )}
+
+        {/* Result count */}
+        <p className="text-center text-[10px] text-gray-600 mt-3">
+          {filteredServices.length} {currentLanguage === 'TR' ? 'servis bulundu' : 'services found'} · {currentLanguage === 'TR' ? 'Sayfa' : 'Page'} {currentPage}/{totalPages || 1}
+        </p>
+
       </section>
 
       {/* Why Choose Us features section */}
       <section id="features-sec" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 border-t border-white/5 relative">
         <div className="absolute top-1/2 left-[-10%] w-[30vw] h-[30vw] bg-purple-900/10 rounded-full blur-[100px] pointer-events-none" />
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
             <span className="px-3 py-1 bg-[#1a133d] border border-purple-500/35 text-purple-400 font-extrabold text-[10px] tracking-wider rounded-full uppercase inline-block">
@@ -481,15 +509,15 @@ export const Landing: React.FC = () => {
             </h2>
             <p className="text-sm text-gray-400 leading-relaxed">
               {currentLanguage === 'TR' 
-                ? 'SMM Pro Group Turkey markası olarak, kendi panelini veya yazılıp bayiliğini yürütmek isteyen müşterilerimize sınırsız hacimde, donmasız ve anında teslim garantili servis sağlıyoruz. Günler süren kargo veya sipariş bekleme süreçlerine son verin.'
+                ? 'SMM Pro Group Turkey markası olarak, kendi panelini veya yazılıp bayiliğini yürütmek isteyen müşterilerimize sınırsız hacimde, donmasız ve anında teslim garantili servis sağlıyoruz.'
                 : 'Enjoy infinite scale capabilities, complete server protection patterns, and near zero lag. We keep standard operations working 24/7 with immediate response parameters.'}
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs pt-4">
               {[
-                { title: 'Otomatik Dağıtım', desc: 'İşlemler tamamen otonom API ile anında başlar.' },
-                { title: '7/24 Teknik Destek', desc: 'Müşteri temsilcilerimiz canlı destek ile anlık cevaplar.' },
-                { title: 'PayTR Güvencesi', desc: 'Kredi kartı ile %100 güvenli 3D Secure bakiye yüklemesi.' },
+                { title: 'Hızlı Sipariş & Teslimat', desc: 'Siparişleriniz anında işlenir, teslimat otomatik başlar.' },
+                { title: 'API & Entegrasyon', desc: 'Kendi panelinizden JSON API ile tam entegrasyon sağlayın.' },
+                { title: 'Güvenli Ödeme', desc: 'Kredi kartı ile %100 güvenli 3D Secure bakiye yüklemesi.' },
                 { title: 'Düşmeyen Garantili', desc: 'Takipçi ve beğenilerde 30 gün boyunca telafi buton seçeneği.' },
               ].map((item, id) => (
                 <div key={id} className="flex gap-3">
@@ -503,7 +531,6 @@ export const Landing: React.FC = () => {
             </div>
           </div>
 
-          {/* Feature visual mock-up block */}
           <div className="bg-[#121226]/50 border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:border-cyan-400/20 transition duration-300">
             <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5 text-[11px]">
               <div className="flex items-center gap-2">
@@ -517,7 +544,7 @@ export const Landing: React.FC = () => {
             <pre className="font-mono text-[10.5px] leading-relaxed text-indigo-300 overflow-x-auto select-all">
 {`{
   "api_action": "place_order",
-  "api_key": "smm_live_v2_918231csa",
+  "api_key": "",
   "service_id": 101,
   "service_quantity": 2500,
   "link": "https://instagram.com/salihmusic",
@@ -536,13 +563,13 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Developer API Documentation card anchor */}
+      {/* Developer API section */}
       <section id="api-sec" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
         <div className="bg-gradient-to-r from-cyan-950/20 to-purple-950/20 border border-white/5 rounded-3xl p-6 sm:p-10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
           <div className="space-y-3.5 max-w-xl text-left">
             <Code className="w-8 h-8 text-cyan-400" />
             <h3 className="text-xl sm:text-2xl font-bold font-sora text-white">
-              {currentLanguage === 'TR' ? 'Kendi Sizin Sitenizden Mi Satış Yapacaksınız?' : 'Are You Reselling from Your Personal Codebase?'}
+              {currentLanguage === 'TR' ? 'Kendi Sitenizden Mi Satış Yapacaksınız?' : 'Are You Reselling from Your Personal Codebase?'}
             </h3>
             <p className="text-xs text-gray-400 leading-relaxed">
               {currentLanguage === 'TR' 
@@ -587,40 +614,25 @@ export const Landing: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer footer-details links */}
+      {/* Footer */}
       <footer className="border-t border-white/5 bg-[#05050f]/90 py-10 text-xs text-gray-500 relative z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white text-xs">
               S
             </div>
-            <span className="font-bold text-gray-300">SMM Pro Group Turkey © 2026. Tüm hakları saklıdır.</span>
+            <span className="font-bold text-gray-300">Bor Media Group © 2026. Tüm hakları saklıdır.</span>
           </div>
-
-          <div className="flex items-center gap-6">
-            {/* Direct Admin Login gateway */}
-            <button
-              onClick={() => {
-                setPortalMode('admin');
-                showToast(currentLanguage === 'TR' ? 'Yönetici kimlik doğrulama konsoluna aktarıldınız.' : 'Navigating to admin portal.', 'info');
-              }}
-              className="hover:underline text-gray-500 hover:text-white font-semibold cursor-pointer"
-            >
-              🔐 {currentLanguage === 'TR' ? 'Sistem Yetkilisi (Admin)' : 'Admin Login Link'}
-            </button>
-            <span>-</span>
-            <span>Uptime 100% Guaranteed</span>
-          </div>
+          <span>Uptime 100% Guaranteed</span>
         </div>
       </footer>
 
-      {/* Authentication Modal - Login & Sign up on public dashboard */}
+      {/* Authentication Modal */}
       {authModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[5000] flex items-center justify-center p-4 animate-fade-in">
-          
+
           <div className="w-full max-w-md bg-[#16162d] border border-white/10 rounded-3xl p-6 shadow-2xl relative animate-scale-up">
-            
-            {/* Close modal button */}
+
             <button
               onClick={() => setAuthModalOpen(false)}
               className="absolute right-4 top-4 p-1 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white cursor-pointer"
@@ -628,7 +640,6 @@ export const Landing: React.FC = () => {
               <X className="w-4 h-4" />
             </button>
 
-            {/* Hub Header */}
             <div className="text-center mb-6">
               <h3 className="text-lg font-bold font-sora text-white">
                 {authTab === 'login' ? (
@@ -644,35 +655,7 @@ export const Landing: React.FC = () => {
               </p>
             </div>
 
-            {/* Quick Demo Assist Links */}
-            {authTab === 'login' && (
-              <div className="mb-4 p-3 bg-purple-950/20 border border-purple-800/25 rounded-2xl space-y-1.5 text-[10.5px]">
-                <span className="font-bold text-purple-400 block">{currentLanguage === 'TR' ? 'HIZLI SINAMA KULLANICILARI:' : 'SIMULATE REAL OR REGISTER:'}</span>
-                <p className="text-gray-400 text-[10px] leading-relaxed">
-                  {currentLanguage === 'TR' ? 'Kayıt olursanız hoş geldin hediyesi ' : 'Upon signing up we load '}
-                  <b className="text-cyan-400">100 TL</b> 
-                  {currentLanguage === 'TR' ? ' yüklenir. Mevcut bayilerle sınamak isterseniz:' : ' to your balance. Or click demo:'}
-                </p>
-                <div className="flex flex-wrap gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('salihmusicinc@gmail.com')}
-                    className="px-2 py-1 bg-white/5 border border-white/10 rounded text-cyan-400 hover:bg-white/10 font-mono text-[9.5px] cursor-pointer"
-                  >
-                    salihmusicinc@gmail.com
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('client@gmail.com')}
-                    className="px-2 py-1 bg-white/5 border border-white/10 rounded text-cyan-400 hover:bg-white/10 font-mono text-[9.5px] cursor-pointer"
-                  >
-                    client@gmail.com
-                  </button>
-                </div>
-              </div>
-            )}
 
-            {/* Modal tabs */}
             <div className="grid grid-cols-2 bg-[#121226] p-1 rounded-2xl mb-4 text-xs font-bold font-sora">
               <button
                 type="button"
@@ -686,7 +669,7 @@ export const Landing: React.FC = () => {
                 onClick={() => setAuthTab('register')}
                 className={`py-2 rounded-xl text-center cursor-pointer transition ${authTab === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
               >
-                {currentLanguage === 'TR' ? 'Kayıt Ol (Ucretsiz)' : 'Sign Up'}
+                {currentLanguage === 'TR' ? 'Kayıt Ol (Ücretsiz)' : 'Sign Up'}
               </button>
             </div>
 
@@ -733,7 +716,7 @@ export const Landing: React.FC = () => {
                 type="submit"
                 className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur - 100 TL Al' : 'Create & Claim 100 TL')}</span>
+                <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur' : 'Create Account')}</span>
                 <ChevronRight className="w-4 h-4" />
               </button>
             </form>

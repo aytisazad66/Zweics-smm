@@ -634,7 +634,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: newId,
       fullName,
       email,
-      balance: 100, // give a visual welcome balance of 100 TL to let them browse easily
+      balance: 0,
       totalOrders: 0,
       joinedDate: new Date().toLocaleDateString('tr-TR'),
       status: 'active' as const
@@ -642,7 +642,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers(prev => [...prev, newUser]);
     setCurrentClientUser(newUser);
     setClientLoggedIn(true);
-    showToast(currentLanguage === 'TR' ? 'Hesabınız oluşturuldu! Deneme amaçlı 100 TL hoș geldin bakiyesi cüzdanınıza eklendi.' : 'Account created! Free test balance of 100 TL deposited.', 'success');
+    showToast(currentLanguage === 'TR' ? 'Hesabınız oluşturuldu! Bakiye yükleyerek sipariş verebilirsiniz.' : 'Account created! Add funds to start placing orders.', 'success');
     addNotification(`Yeni bayilik kaydı yapıldı: ${fullName} (${email})`, 'user');
     return true;
   };
@@ -850,110 +850,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addNotification(`Müşteri yeni destek talebi açtı: ${newTicketId} - ${subject}`, 'ticket');
   };
 
-  // Automated background processing of active SMM Provider orders
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setOrders(prevOrders => {
-        let changed = false;
-        const processed = prevOrders.map(order => {
-          if (order.status === 'Bekliyor') {
-            changed = true;
-            // Select active API provider name (default to TurkPaneli SMM API)
-            const activeProvName = "TurkPaneli.com SMM Dağıtıcı API";
-            const apiOrderId = Math.floor(Math.random() * 89999 + 10000);
-            const wholesalecost = parseFloat((order.charge * 0.72).toFixed(2));
-
-            // Reduce provider balance dynamically
-            setTimeout(() => {
-              setApiProviders(prevProviders => 
-                prevProviders.map(p => 
-                  p.id === 'API_TURKPANELI' 
-                    ? { ...p, balance: Math.max(0, parseFloat(((p.balance || 0) - wholesalecost).toFixed(2))) } 
-                    : p
-                )
-              );
-            }, 0);
-
-            return {
-              ...order,
-              status: 'İşlemde',
-              logs: [
-                ...order.logs,
-                { 
-                  time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), 
-                  text: 'API Bağlantısı kuruluyor. SSL el sıkışması tamamlandı.' 
-                },
-                { 
-                  time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }), 
-                  text: `Sipariş '${activeProvName}' sağlayıcısına başarılı şekilde iletildi. API SiparişID: #${apiOrderId}, Toptan Bedel: ₺${wholesalecost}` 
-                }
-              ]
-            };
-          }
-
-          if (order.status === 'İşlemde') {
-            const logsCount = order.logs.length;
-            if (logsCount === 3) {
-              changed = true;
-              const completedQty = Math.floor(order.quantity * 0.45);
-              return {
-                ...order,
-                logs: [
-                  ...order.logs,
-                  {
-                    time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-                    text: `API Sağlayıcı Canlı Güncellemesi: Gönderim devam ediyor. (Tamamlanan: ${completedQty} / ${order.quantity})`
-                  }
-                ]
-              };
-            } else if (logsCount === 4) {
-              changed = true;
-              const completedQty = Math.floor(order.quantity * 0.90);
-              return {
-                ...order,
-                logs: [
-                  ...order.logs,
-                  {
-                    time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-                    text: `API Sağlayıcı Canlı Güncellemesi: Tamamlanmak üzere. (Tamamlanan: ${completedQty} / ${order.quantity})`
-                  }
-                ]
-              };
-            } else if (logsCount === 5) {
-              changed = true;
-              
-              // Trigger success user notification
-              setTimeout(() => {
-                addNotification(`Sipariş tamamlandı! ID: ${order.id} (${order.serviceName.substring(0, 20)}...)`, 'info');
-              }, 0);
-
-              return {
-                ...order,
-                status: 'Tamamlandı',
-                logs: [
-                  ...order.logs,
-                  {
-                    time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
-                    text: `API Entegrasyon Raporu: Sipariş başarıyla 'Tamamlandı' durumuna geçti. Profil etkileri doğrulandı.`
-                  }
-                ]
-              };
-            }
-          }
-
-          return order;
-        });
-
-        // Sync with localStorage
-        if (changed) {
-          localStorage.setItem('smm_orders', JSON.stringify(processed));
-        }
-        return changed ? processed : prevOrders;
-      });
-    }, 6000); // Trigger background tick every 6 seconds
-
-    return () => clearInterval(interval);
-  }, []);
   
   return (
     <AppContext.Provider value={{
