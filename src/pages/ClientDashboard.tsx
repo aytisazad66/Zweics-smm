@@ -292,14 +292,13 @@ export const ClientDashboard: React.FC = () => {
           setApiPlaygroundResponse(orderSuccess ? {
             status: "success",
             order_id: "ORD-" + Math.floor(Math.random() * 89999 + 10000),
-            provider_reference: "API_ROUTER_TURKSMM_AUTO",
             computed_charge: `${computedCharge} TRY`,
-            message: "Sipariş sağlayıcıya iletildi.",
+            message: "Sipariş başarıyla işleme alındı.",
             sandbox_mode: false
           } : {
             status: "error",
-            error_code: "PROVIDER_REJECTED",
-            message: "Sağlayıcı siparişi reddetti. Sipariş iptal edildi ve bakiye iade edildi.",
+            error_code: "ORDER_FAILED",
+            message: "Sipariş işlenemedi. Bakiyeniz iade edildi.",
           });
         }
       }
@@ -700,8 +699,8 @@ export const ClientDashboard: React.FC = () => {
             </div>
             <p className="text-[11px]">
               {currentLanguage === 'TR' 
-                ? 'Siparişleriniz entegrasyon API sağlayıcımız tarafından tam otomatik olarak alınır, işleme konur ve anlık sonuçlandırılır. Sizin el ile müdahale etmenize gerek yoktur!'
-                : 'All sub-orders are instantly forwarded to primary API clusters. Logs fetch and resolve completely hands-free.'}
+                ? 'Siparişleriniz sistemimiz tarafından tam otomatik olarak alınır, işleme konur ve anlık sonuçlandırılır. Sizin el ile müdahale etmenize gerek yoktur!'
+                : 'All orders are instantly processed by our automated system. No manual intervention required.'}
             </p>
           </div>
 
@@ -726,8 +725,8 @@ export const ClientDashboard: React.FC = () => {
                     </h2>
                     <p className="text-gray-400 text-xs mt-1">
                       {currentLanguage === 'TR' 
-                        ? 'Sanal SMM Bayi paneliniz aktif. Entegre API sağlayıcımız üzerinden 7/24 kesintisiz sosyal ağ gönderimi sağlayabilirsiniz.' 
-                        : 'Your developer SMM node is synchronized. Seamless social channel deliveries are active.'}
+                        ? 'Bayi paneliniz aktif. Sistemimiz üzerinden 7/24 kesintisiz sosyal ağ gönderimi sağlayabilirsiniz.' 
+                        : 'Your reseller panel is active. 24/7 seamless social media order processing is enabled.'}
                     </p>
                   </div>
                   <div className="bg-[#090918]/60 p-3 rounded-2xl border border-white/5 flex items-center gap-3 shrink-0">
@@ -773,7 +772,7 @@ export const ClientDashboard: React.FC = () => {
                   <div className="mt-2 text-xl font-extrabold font-mono text-yellow-500">{activeOrdersCount} Adet</div>
                   <span className="text-[10px] text-gray-400 flex items-center gap-1 mt-1.5">
                     <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-                    <span>{currentLanguage === 'TR' ? 'API tarafından besleniyor' : 'Fueled by provider API'}</span>
+                    <span>{currentLanguage === 'TR' ? 'Otomatik işleniyor' : 'Auto-processing'}</span>
                   </span>
                 </div>
 
@@ -935,7 +934,7 @@ export const ClientDashboard: React.FC = () => {
                   </div>
                   <div>
                     <span className="text-white font-bold block">{currentLanguage === 'TR' ? 'Süper Hızlı API Dağıtım Motoru Aktif!' : 'Wholesale SMM API Connection Active'}</span>
-                    <span className="text-slate-400 block mt-0.5">{currentLanguage === 'TR' ? 'Siparişiniz saniyeler içinde SSL tünellerimizden geçerek sağlayıcı sunucularına aktarılır.' : 'Our background processor automatically routes orders through wholesales channels.'}</span>
+                    <span className="text-slate-400 block mt-0.5">{currentLanguage === 'TR' ? 'Siparişiniz saniyeler içinde SSL tünellerimizden geçerek otomatik olarak işleme alınır.' : 'Your order is instantly processed through our secured SSL infrastructure.'}</span>
                   </div>
                 </div>
                 <button 
@@ -1078,10 +1077,10 @@ export const ClientDashboard: React.FC = () => {
                           <span className="font-bold text-cyan-400 font-mono mt-1 block uppercase">{activeServiceObj.platform}</span>
                         </div>
                         <div>
-                          <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'Sağlayıcı Protokol' : 'API Connection'}</span>
+                          <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'İşlem Sistemi' : 'Processing System'}</span>
                           <span className="font-bold text-purple-400 mt-1 block flex items-center gap-1">
                             <Zap className="w-3.5 h-3.5 shrink-0" />
-                            <span>TurkPaneli SMM API</span>
+                            <span>{currentLanguage === 'TR' ? 'Otomatik SMM Sistemi' : 'Automated SMM System'}</span>
                           </span>
                         </div>
                         <div>
@@ -1209,7 +1208,7 @@ export const ClientDashboard: React.FC = () => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
                 <div>
                   <h3 className="text-base font-bold font-sora text-white">{currentLanguage === 'TR' ? 'Harcamalarınız & Sipariş Takip Pipeline' : 'Historical Order Submissions'}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{currentLanguage === 'TR' ? 'Siparişinize tıklayarak anlık API sağlayıcı dağıtım loglarını canlı canlı izleyebilirsiniz.' : 'Click any submission to view live API cluster logs in realtime.'}</p>
+                  <p className="text-xs text-gray-500 mt-1">{currentLanguage === 'TR' ? 'Siparişinize tıklayarak anlık işlem loglarını takip edebilirsiniz.' : 'Click any order to view live processing logs in realtime.'}</p>
                 </div>
 
                 <div className="relative w-full sm:w-64">
@@ -1312,7 +1311,7 @@ export const ClientDashboard: React.FC = () => {
                                           <span>&gt;&gt;</span>
                                           <span className="flex items-center gap-1.5 font-bold">
                                             <RefreshCw className="w-3 h-3 animate-spin" />
-                                            <span>API Sağlayıcı kuyruğu bekleniyor... Sonuçlar otomatik olarak yansır!</span>
+                                            <span>İşleme alındı, sonuçlar otomatik olarak güncellenir...</span>
                                           </span>
                                         </div>
                                       )}

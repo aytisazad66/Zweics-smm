@@ -581,7 +581,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           pricePer1000: isNaN(pricePer1000) ? 10 : pricePer1000,
           status: 'active',
           sortOrder: services.length + newServices.length + 1,
-          description: `${provider.region === 'TR' ? 'TurkPaneli' : 'ResellerProvider'} - ${category}`,
+          description: `${category}`,
           providerServiceId: Number(serviceId),
           providerApiId: providerId
         };
@@ -696,7 +696,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (service.providerServiceId && service.providerApiId) {
       const provider = apiProviders.find(p => p.id === service.providerApiId && p.isActive && p.key && p.key.trim() !== '');
       if (provider) {
-        orderLogs.push({ time: nowTime, text: `Sağlayıcıya gönderiliyor: ${provider.name}...` });
+        orderLogs.push({ time: nowTime, text: 'Sipariş işleme alınıyor...' });
         try {
           const apiResult = await callProviderApi(provider, {
             key: provider.key,
@@ -711,10 +711,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             providerOrderId = String(apiResult.order);
             providerApiId = provider.id;
             finalStatus = 'İşlemde';
-            orderLogs.push({ time: nowTime, text: `✅ Sağlayıcı siparişi kabul etti. Sağlayıcı Sipariş ID: ${providerOrderId}` });
+            orderLogs.push({ time: nowTime, text: `✅ Sipariş başarıyla işleme alındı. Referans No: ${providerOrderId}` });
           } else if (apiResult && apiResult.error) {
             // Provider returned an error — refund and cancel
-            orderLogs.push({ time: nowTime, text: `❌ Sağlayıcı hatası: ${apiResult.error} — Bakiye iade edildi.` });
+            orderLogs.push({ time: nowTime, text: `❌ Sipariş işlenemedi. Bakiyeniz iade edildi.` });
             finalStatus = 'İptal';
             // Refund the user
             setUsers(prev => prev.map(u => {
@@ -727,8 +727,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }));
             showToast(
               currentLanguage === 'TR'
-                ? `Sipariş başarısız: ${apiResult.error}. Bakiyeniz iade edildi.`
-                : `Order failed: ${apiResult.error}. Your balance has been refunded.`,
+                ? 'Sipariş işlenemedi. Bakiyeniz iade edildi.'
+                : 'Order could not be processed. Your balance has been refunded.',
               'error'
             );
             const cancelledOrder: Order = {
@@ -746,25 +746,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               logs: orderLogs,
             };
             setOrders(prev => [cancelledOrder, ...prev]);
-            addNotification(`Sipariş başarısız (sağlayıcı hatası): ${service.name.substring(0, 20)}`, 'error');
+            addNotification(`Sipariş başarısız: ${service.name.substring(0, 20)}`, 'error');
             return false;
           } else {
             // Unexpected response — keep as Bekliyor, admin will handle
-            orderLogs.push({ time: nowTime, text: `⚠️ Sağlayıcıdan beklenmeyen yanıt. Sipariş manuel incelemede.` });
+            orderLogs.push({ time: nowTime, text: '⚠️ Sipariş kuyruğa alındı, işleme devam ediyor.' });
             finalStatus = 'Bekliyor';
           }
         } catch (err: any) {
           // Network/proxy error — keep as Bekliyor, admin will handle
-          orderLogs.push({ time: nowTime, text: `⚠️ Sağlayıcıya bağlanılamadı: ${err.message}. Sipariş manuel incelemede.` });
+          orderLogs.push({ time: nowTime, text: '⚠️ Sipariş kuyruğa alındı, kısa süre içinde işlenecek.' });
           finalStatus = 'Bekliyor';
         }
       } else {
-        orderLogs.push({ time: nowTime, text: '⚠️ Sağlayıcı aktif değil veya API Key girilmemiş. Sipariş manuel işleme alındı.' });
+        orderLogs.push({ time: nowTime, text: 'Sipariş kuyruğa alındı.' });
         finalStatus = 'Bekliyor';
       }
     } else {
       // No provider linked — manual order
-      orderLogs.push({ time: nowTime, text: 'Sağlayıcı bağlantısı yok, sipariş manuel işleme alındı.' });
+      orderLogs.push({ time: nowTime, text: 'Sipariş kuyruğa alındı.' });
       finalStatus = 'Bekliyor';
     }
 
@@ -791,15 +791,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (finalStatus === 'İşlemde') {
       showToast(
         currentLanguage === 'TR'
-          ? `✅ Sipariş sağlayıcıya iletildi! ID: ${newOrderId} | Sağlayıcı ID: ${providerOrderId}`
-          : `✅ Order sent to provider! ID: ${newOrderId} | Provider ID: ${providerOrderId}`,
+          ? `✅ Sipariş başarıyla işleme alındı! Sipariş ID: ${newOrderId}`
+          : `✅ Order successfully placed! Order ID: ${newOrderId}`,
         'success'
       );
     } else {
       showToast(
         currentLanguage === 'TR'
-          ? `Sipariş alındı! ID: ${newOrderId} (Manuel işlem kuyruğuna alındı)`
-          : `Order received! ID: ${newOrderId} (Added to manual processing queue)`,
+          ? `Sipariş alındı! Sipariş ID: ${newOrderId}`
+          : `Order received! Order ID: ${newOrderId}`,
         'info'
       );
     }

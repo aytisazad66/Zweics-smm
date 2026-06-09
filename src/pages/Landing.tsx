@@ -344,7 +344,7 @@ export const Landing: React.FC = () => {
           </h2>
           <p className="text-xs sm:text-sm text-gray-400 max-w-2xl mx-auto">
             {currentLanguage === 'TR' 
-              ? 'Tüm fiyatlarımız otomatik olarak döviz kuruna ve sağlayıcı maliyetine göre güncellenir. Fiyatlar 1000 adet gönderim için geçerlidir.' 
+              ? 'Tüm fiyatlarımız piyasa koşullarına göre güncellenir. Fiyatlar 1000 adet gönderim için geçerlidir.' 
               : 'Our system updates pricing on the fly based on network loads. Unit costs apply per 1,000 requests.'}
           </p>
         </div>
