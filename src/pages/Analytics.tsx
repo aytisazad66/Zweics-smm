@@ -1,11 +1,57 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppState } from '../context/AppContext';
-import { platformStats, thirtyDaysIncomeData } from '../data/mockData';
 import { BarChart, Wallet, Calendar, Download, TrendingUp, Compass, Award, Activity } from 'lucide-react';
 
 export const Analytics: React.FC = () => {
-  const { currentLanguage, showToast } = useAppState();
+  const { currentLanguage, showToast, orders } = useAppState();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('30d');
+
+  // Compute income data from real orders
+  const thirtyDaysIncomeData = useMemo(() => {
+    const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    const map: Record<string, { income: number; users: Set<string> }> = {};
+    const cutoff = dateRange === '7d' ? Date.now() - 7 * 86400000
+      : dateRange === '30d' ? Date.now() - 30 * 86400000 : 0;
+    orders.forEach(o => {
+      const d = new Date(o.date);
+      if (d.getTime() < cutoff) return;
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      if (!map[label]) map[label] = { income: 0, users: new Set() };
+      map[label].income += o.charge;
+      map[label].users.add(o.userId);
+    });
+    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      result.push({ date: label, income: map[label]?.income || 0, users: map[label]?.users.size || 0 });
+    }
+    return result;
+  }, [orders, dateRange]);
+
+  // Platform profitability from real orders
+  const platformProfitStats = useMemo(() => {
+    const cutoff = dateRange === '7d' ? Date.now() - 7 * 86400000
+      : dateRange === '30d' ? Date.now() - 30 * 86400000 : 0;
+    const stats: Record<string, { revenue: number; count: number }> = {};
+    orders.forEach(o => {
+      const d = new Date(o.date);
+      if (d.getTime() < cutoff) return;
+      if (!stats[o.platform]) stats[o.platform] = { revenue: 0, count: 0 };
+      stats[o.platform].revenue += o.charge;
+      stats[o.platform].count++;
+    });
+    return Object.entries(stats)
+      .sort((a, b) => b[1].revenue - a[1].revenue)
+      .slice(0, 3)
+      .map(([name, data]) => ({
+        tag: name,
+        profit: `${data.revenue.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} TL`,
+        margin: `${orders.length > 0 ? Math.round((data.count / orders.length) * 100) : 0}%`,
+        count: `${data.count} sipariş`
+      }));
+  }, [orders, dateRange]);
 
   // Simulated export to CSV
   const handleExportCSV = () => {
@@ -235,11 +281,9 @@ export const Analytics: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[
-            { tag: "Instagram", profit: "14,520.00 TL", margin: "45.0%", count: "128 sipariş" },
-            { tag: "TikTok", profit: "8,920.00 TL", margin: "40.2%", count: "98 sipariş" },
-            { tag: "YouTube", profit: "5,340.00 TL", margin: "38.5%", count: "42 sipariş" }
-          ].map((item, idx) => (
+          {platformProfitStats.length === 0 ? (
+          <p className="text-xs text-gray-500 italic text-center py-4 col-span-3">Henüz veri bulunmamaktadır. Sipariş girildikçe veriler burada görünecek.</p>
+        ) : platformProfitStats.map((item, idx) => (
             <div id={`profit-stat-${item.tag}`} key={idx} className="p-4 bg-[#121226]/50 border border-white/5 rounded-2xl space-y-2">
               <span className="text-[10px] bg-cyan-950/20 border border-cyan-800/20 text-cyan-400 px-2 py-0.5 rounded font-black font-mono">
                 RANK #{idx + 1}

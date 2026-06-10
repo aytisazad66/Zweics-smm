@@ -2,7 +2,6 @@ import React from 'react';
 import { AppProvider, useAppState } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
-import { LiveSupport } from './components/LiveSupport';
 import { OnboardingWizard } from './components/OnboardingWizard';
 import { CommandPalette } from './components/CommandPalette';
 
@@ -115,9 +114,6 @@ const AppContent: React.FC = () => {
               {renderActiveAdminPage()}
             </div>
           </main>
-
-          {/* Floating live AI assistant chat bubble widget */}
-          <LiveSupport />
 
           {/* Tutorial onboarding wizard */}
           <OnboardingWizard />

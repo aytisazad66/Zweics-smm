@@ -55,6 +55,43 @@ function smmProxyPlugin(): Plugin {
   };
 }
 
+function kvStorePlugin(): Plugin {
+  const DATA_DIR = path.resolve('./data');
+  if (!fs.existsSync(DATA_DIR)) {
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+  }
+  return {
+    name: 'kv-store',
+    configureServer(server) {
+      server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        if (!req.url?.startsWith('/api/kv/')) { next(); return; }
+        const key = req.url.replace('/api/kv/', '').split('?')[0];
+        const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '');
+        if (!safeKey) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid key' })); return; }
+        const file = path.join(DATA_DIR, `${safeKey}.json`);
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Cache-Control', 'no-store');
+        if (req.method === 'GET') {
+          if (fs.existsSync(file)) { res.writeHead(200); res.end(fs.readFileSync(file, 'utf-8')); }
+          else { res.writeHead(200); res.end(JSON.stringify({ value: null })); }
+          return;
+        }
+        if (req.method === 'POST') {
+          let body = '';
+          req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+          req.on('end', () => {
+            try { fs.writeFileSync(file, body, 'utf-8'); res.writeHead(200); res.end(JSON.stringify({ ok: true })); }
+            catch (err: any) { res.writeHead(500); res.end(JSON.stringify({ error: err.message })); }
+          });
+          return;
+        }
+        next();
+      });
+    }
+  };
+}
+
 function copyFilesAfterBuild(): Plugin {
   return {
     name: 'copy-cpanel-files',
@@ -73,7 +110,7 @@ function copyFilesAfterBuild(): Plugin {
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), smmProxyPlugin(), copyFilesAfterBuild()],
+    plugins: [react(), tailwindcss(), smmProxyPlugin(), kvStorePlugin(), copyFilesAfterBuild()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

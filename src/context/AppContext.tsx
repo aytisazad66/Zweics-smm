@@ -192,28 +192,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentClientUser]);
   
-  // Persistent Storage
+  const saveToApi = (key: string, value: unknown) => {
+    fetch(`/api/kv/${key}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ value: JSON.stringify(value) })
+    }).catch(() => {});
+  };
+
+  // Persistent Storage (localStorage + server sync)
   useEffect(() => {
     localStorage.setItem('smm_services', JSON.stringify(services));
+    saveToApi('smm_services', services);
   }, [services]);
   useEffect(() => {
     localStorage.setItem('smm_orders', JSON.stringify(orders));
+    saveToApi('smm_orders', orders);
   }, [orders]);
   useEffect(() => {
     localStorage.setItem('smm_users', JSON.stringify(users));
+    saveToApi('smm_users', users);
   }, [users]);
   useEffect(() => {
     localStorage.setItem('smm_payment_methods', JSON.stringify(paymentMethods));
+    saveToApi('smm_payment_methods', paymentMethods);
   }, [paymentMethods]);
   useEffect(() => {
     localStorage.setItem('smm_payment_requests', JSON.stringify(paymentRequests));
+    saveToApi('smm_payment_requests', paymentRequests);
   }, [paymentRequests]);
   useEffect(() => {
     localStorage.setItem('smm_tickets', JSON.stringify(tickets));
+    saveToApi('smm_tickets', tickets);
   }, [tickets]);
   useEffect(() => {
     localStorage.setItem('smm_api_providers', JSON.stringify(apiProviders));
+    saveToApi('smm_api_providers', apiProviders);
   }, [apiProviders]);
+
+  // Load from server on mount (enables cross-device sync)
+  useEffect(() => {
+    const syncFromServer = async () => {
+      const entries: [string, React.Dispatch<React.SetStateAction<any>>][] = [
+        ['smm_services', setServices],
+        ['smm_orders', setOrders],
+        ['smm_users', setUsers],
+        ['smm_payment_methods', setPaymentMethods],
+        ['smm_payment_requests', setPaymentRequests],
+        ['smm_tickets', setTickets],
+        ['smm_api_providers', setApiProviders],
+      ];
+      for (const [key, setter] of entries) {
+        try {
+          const res = await fetch(`/api/kv/${key}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.value) setter(JSON.parse(data.value));
+          }
+        } catch { /* server unavailable, use localStorage */ }
+      }
+    };
+    syncFromServer();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Toast and notifications states
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);

@@ -30,6 +30,8 @@ export const Landing: React.FC = () => {
     registerClient,
     setClientLoggedIn,
     setCurrentClientUser,
+    clientLoggedIn,
+    currentClientUser,
     users,
     showToast
   } = useAppState();
@@ -152,7 +154,7 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Desktop Nav Items */}
-          <div className="hidden lg:flex items-center gap-8 text-xs font-semibold text-gray-300">
+          <div className="hidden md:flex items-center gap-8 text-xs font-semibold text-gray-300">
             <a href="#services-sec" className="hover:text-[#00D4FF] transition-colors">
               {currentLanguage === 'TR' ? 'Hizmetler & Fiyatlar' : 'Services & Catalog'}
             </a>
@@ -168,7 +170,7 @@ export const Landing: React.FC = () => {
           </div>
 
           {/* Actions panel */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden md:flex items-center gap-4 ml-4">
             {/* Language switcher */}
             <button
               onClick={() => setCurrentLanguage(currentLanguage === 'TR' ? 'EN' : 'TR')}
@@ -178,16 +180,25 @@ export const Landing: React.FC = () => {
               <span>{currentLanguage}</span>
             </button>
 
-            <button
-              id="landing-signin-btn"
-              onClick={() => {
-                setAuthTab('login');
-                setAuthModalOpen(true);
-              }}
-              className="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold hover:text-white transition cursor-pointer"
-            >
-              {currentLanguage === 'TR' ? 'Müşteri Girişi' : 'Client Hub'}
-            </button>
+            {clientLoggedIn && currentClientUser ? (
+              <button
+                onClick={() => setPortalMode('client')}
+                className="px-5 py-2.5 bg-cyan-500/10 border border-cyan-400/30 text-cyan-400 rounded-xl text-xs font-bold hover:bg-cyan-500/20 transition cursor-pointer"
+              >
+                {currentLanguage === 'TR' ? `← ${currentClientUser.fullName.split(' ')[0]}` : `← Dashboard`}
+              </button>
+            ) : (
+              <button
+                id="landing-signin-btn"
+                onClick={() => {
+                  setAuthTab('login');
+                  setAuthModalOpen(true);
+                }}
+                className="px-5 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-xs font-bold hover:text-white transition cursor-pointer"
+              >
+                {currentLanguage === 'TR' ? 'Müşteri Girişi' : 'Client Hub'}
+              </button>
+            )}
 
             <button
               id="landing-signup-btn"
@@ -204,7 +215,7 @@ export const Landing: React.FC = () => {
           {/* Hamburger button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="lg:hidden p-2 text-gray-400 hover:text-white bg-white/5 border border-white/10 rounded-xl cursor-pointer"
+            className="md:hidden p-2 text-gray-400 hover:text-white bg-white/5 border border-white/10 rounded-xl cursor-pointer"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>

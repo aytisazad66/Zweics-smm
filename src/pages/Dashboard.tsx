@@ -1,9 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAppState } from '../context/AppContext';
-import { 
-  thirtyDaysIncomeData, 
-  platformStats 
-} from '../data/mockData';
 import { 
   TrendingUp, 
   Users, 
@@ -49,20 +45,68 @@ export const Dashboard: React.FC = () => {
 
   const totalRevenue = orders
     .filter(o => o.status === 'Tamamlandı' || o.status === 'İşlemde')
-    .reduce((sum, o) => sum + o.charge, 0) + 18500; // Adding a base revenue of 18500 TL to match rich SMM logs
+    .reduce((sum, o) => sum + o.charge, 0);
 
   const pendingWireClaims = paymentRequests
     .filter(r => r.status === 'Beklemede')
     .reduce((sum, r) => sum + r.amount, 0);
 
-  // Bestselling services: group and rank orders
-  const bestSellers = [
-    { name: "Instagram Real Turkish Likes", sales: 840, color: "bg-red-500", icon: Instagram },
-    { name: "TikTok Global Premium Viewers", sales: 520, color: "bg-cyan-400", icon: Activity },
-    { name: "YouTube Organic Retention Hours", sales: 340, color: "bg-rose-600", icon: Youtube },
-    { name: "Twitter NFT Custom Retweets", sales: 180, color: "bg-blue-400", icon: Twitter },
-    { name: "Telegram Channel Real Members", sales: 120, color: "bg-blue-500", icon: SendIcon }
-  ];
+  // Bestselling services: computed from real orders
+  const bestSellers = useMemo(() => {
+    const counts: Record<string, { name: string; sales: number; platform: string }> = {};
+    orders.forEach(o => {
+      if (!counts[o.serviceId]) counts[o.serviceId] = { name: o.serviceName, sales: 0, platform: o.platform };
+      counts[o.serviceId].sales++;
+    });
+    return Object.values(counts)
+      .sort((a, b) => b.sales - a.sales)
+      .slice(0, 5)
+      .map(s => {
+        const platLower = s.platform.toLowerCase();
+        const icon = platLower.includes('instagram') ? Instagram
+          : platLower.includes('youtube') ? Youtube
+          : platLower.includes('twitter') ? Twitter
+          : platLower.includes('telegram') ? SendIcon
+          : Activity;
+        return { ...s, icon };
+      });
+  }, [orders]);
+
+  // Real platform distribution from actual orders
+  const realPlatformStats = useMemo(() => {
+    const counts: Record<string, number> = {};
+    orders.forEach(o => { counts[o.platform] = (counts[o.platform] || 0) + 1; });
+    const total = orders.length || 1;
+    const colorMap: Record<string, string> = {
+      'Instagram': '#E1306C', 'TikTok': '#00D4FF', 'YouTube': '#FF0000',
+      'Twitter': '#1DA1F2', 'Spotify': '#1DB954', 'Telegram': '#2CA5E0',
+    };
+    return Object.entries(counts)
+      .map(([name, count]) => ({ name, value: Math.round((count / total) * 100), color: colorMap[name] || '#7B2FFF' }))
+      .sort((a, b) => b.value - a.value);
+  }, [orders]);
+
+  // 30-day income chart data from real orders
+  const realIncomeData = useMemo(() => {
+    const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    const map: Record<string, { income: number; users: Set<string> }> = {};
+    const thirtyAgo = Date.now() - 30 * 86400000;
+    orders.forEach(o => {
+      const d = new Date(o.date);
+      if (d.getTime() < thirtyAgo) return;
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      if (!map[label]) map[label] = { income: 0, users: new Set() };
+      map[label].income += o.charge;
+      map[label].users.add(o.userId);
+    });
+    const result = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      result.push({ date: label, income: map[label]?.income || 0, users: map[label]?.users.size || 0 });
+    }
+    return result;
+  }, [orders]);
 
   // Colors for Platform Donut Chart
   const getPlatformIcon = (plat: string) => {
@@ -79,9 +123,9 @@ export const Dashboard: React.FC = () => {
   // Render SVG Area Line Chart Son 30 Gün Gelir Raporu
   const chartHeight = 180;
   const chartWidth = 560;
-  const maxIncomeVal = Math.max(...thirtyDaysIncomeData.map(d => d.income));
-  const points = thirtyDaysIncomeData.map((d, index) => {
-    const x = (index / (thirtyDaysIncomeData.length - 1)) * chartWidth;
+  const maxIncomeVal = Math.max(...realIncomeData.map(d => d.income), 1);
+  const points = realIncomeData.map((d, index) => {
+    const x = (index / (realIncomeData.length - 1)) * chartWidth;
     const y = chartHeight - (d.income / maxIncomeVal) * (chartHeight - 30);
     return { x, y, data: d };
   });
@@ -308,22 +352,22 @@ export const Dashboard: React.FC = () => {
             </svg>
 
             {/* Custom interactive tooltip overlay */}
-            {hoveredDataIndex !== null && (
+            {hoveredDataIndex !== null && realIncomeData[hoveredDataIndex] && (
               <div 
                 className="absolute z-25 bg-[#121226] border border-cyan-400/40 p-3 rounded-xl shadow-xl pointer-events-none animate-scale-up"
                 style={{
-                  left: `${(hoveredDataIndex / (thirtyDaysIncomeData.length - 1)) * 90}%`,
+                  left: `${(hoveredDataIndex / (realIncomeData.length - 1)) * 90}%`,
                   bottom: '50px'
                 }}
               >
                 <span className="text-[9px] font-bold text-cyan-400 block tracking-wide uppercase">
-                  {thirtyDaysIncomeData[hoveredDataIndex].date} Gelir Raporu
+                  {realIncomeData[hoveredDataIndex].date} Gelir Raporu
                 </span>
                 <p className="text-sm font-bold text-white mt-1">
-                  {thirtyDaysIncomeData[hoveredDataIndex].income.toLocaleString('tr-TR')} ₺
+                  {realIncomeData[hoveredDataIndex].income.toLocaleString('tr-TR')} ₺
                 </p>
                 <span className="text-[10px] text-gray-500 block">
-                  +{thirtyDaysIncomeData[hoveredDataIndex].users} Yeni Kullanıcı
+                  +{realIncomeData[hoveredDataIndex].users} Yeni Kullanıcı
                 </span>
               </div>
             )}
@@ -345,7 +389,9 @@ export const Dashboard: React.FC = () => {
           <div className="py-6 flex flex-col items-center justify-center gap-5">
             {/* Visual stacked gauge bars */}
             <div className="w-full space-y-3">
-              {platformStats.map(stat => (
+              {realPlatformStats.length === 0 ? (
+                <p className="text-xs text-gray-500 italic text-center py-4">Henüz sipariş bulunmamaktadır.</p>
+              ) : realPlatformStats.map(stat => (
                 <div id={`stat-bar-${stat.name}`} key={stat.name} className="space-y-1">
                   <div className="flex items-center justify-between text-xs font-semibold">
                     <div className="flex items-center gap-1.5 text-gray-300">
@@ -445,7 +491,9 @@ export const Dashboard: React.FC = () => {
               {currentLanguage === 'TR' ? 'En Popüler Servisler' : 'Top Performing Services'}
             </h3>
             <div className="space-y-4">
-              {bestSellers.map(service => {
+              {bestSellers.length === 0 ? (
+                <p className="text-xs text-gray-500 italic text-center py-4">Henüz sipariş bulunmamaktadır.</p>
+              ) : bestSellers.map((service, rank) => {
                 const IconComp = service.icon;
                 return (
                   <div id={`bestseller-bar-${service.name.replace(/ /g, '-')}`} key={service.name} className="flex items-center justify-between text-xs">
@@ -454,12 +502,12 @@ export const Dashboard: React.FC = () => {
                         <IconComp className="w-4 h-4 text-gray-400" />
                       </div>
                       <div>
-                        <p className="font-semibold text-white leading-tight">{service.name}</p>
-                        <p className="text-[10px] text-gray-500 mt-1">{service.sales} {currentLanguage === 'TR' ? 'sipariş tamamlandı' : 'active executions'}</p>
+                        <p className="font-semibold text-white leading-tight line-clamp-1">{service.name}</p>
+                        <p className="text-[10px] text-gray-500 mt-1">{service.sales} {currentLanguage === 'TR' ? 'sipariş' : 'orders'}</p>
                       </div>
                     </div>
                     <span className="font-bold text-cyan-400 font-mono bg-cyan-950/15 border border-cyan-800/20 px-2 py-0.5 rounded-lg">
-                      #{bestSellers.indexOf(service) + 1}
+                      #{rank + 1}
                     </span>
                   </div>
                 );

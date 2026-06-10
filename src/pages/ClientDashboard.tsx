@@ -175,6 +175,57 @@ export const ClientDashboard: React.FC = () => {
     return clientOrders.filter(o => o.status === 'Tamamlandı').length;
   }, [clientOrders]);
 
+  // Services catalog pagination
+  const CATALOG_PAGE_SIZE = 20;
+  const [catalogPage, setCatalogPage] = useState(1);
+
+  const filteredCatalogServices = useMemo(() => {
+    setCatalogPage(1);
+    return services
+      .filter(s => s.status === 'active')
+      .filter(s => selectedServicePlatformFilter === 'All' || s.platform === selectedServicePlatformFilter)
+      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()));
+  }, [services, selectedServicePlatformFilter, servicesSearch]);
+
+  const catalogTotalPages = Math.ceil(filteredCatalogServices.length / CATALOG_PAGE_SIZE);
+  const paginatedCatalogServices = filteredCatalogServices.slice(
+    (catalogPage - 1) * CATALOG_PAGE_SIZE,
+    catalogPage * CATALOG_PAGE_SIZE
+  );
+
+  // Monthly trend data from real orders (last 4 weeks)
+  const monthlyTrendData = useMemo(() => {
+    const now = new Date();
+    const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+    const points = [];
+    for (let i = 4; i >= 0; i--) {
+      const weekStart = new Date(now.getTime() - (i + 1) * 7 * 86400000);
+      const weekEnd = new Date(now.getTime() - i * 7 * 86400000);
+      const amount = clientOrders
+        .filter(o => {
+          const d = new Date(o.date);
+          return d >= weekStart && d < weekEnd;
+        })
+        .reduce((sum, o) => sum + o.charge, 0);
+      const label = `${weekEnd.getDate().toString().padStart(2,'0')} ${MONTHS[weekEnd.getMonth()]}`;
+      points.push({ label, amount });
+    }
+    return points;
+  }, [clientOrders]);
+
+  const trendSvgPath = useMemo(() => {
+    const max = Math.max(...monthlyTrendData.map(d => d.amount), 1);
+    const coords = monthlyTrendData.map((d, i) => {
+      const x = i * 25;
+      const y = 25 - (d.amount / max) * 20;
+      return { x, y: parseFloat(y.toFixed(1)) };
+    });
+    const line = coords.map((c, i) => `${i === 0 ? 'M' : 'L'} ${c.x},${c.y}`).join(' ');
+    const area = `${line} L 100,30 L 0,30 Z`;
+    const dots = coords.filter((_, i) => i > 0 && i < coords.length - 1);
+    return { line, area, dots, coords };
+  }, [monthlyTrendData]);
+
   // Simulation handlers
   const handlePlaceOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -831,36 +882,39 @@ export const ClientDashboard: React.FC = () => {
                       <div className="border-b border-white/5 w-full h-0" />
                     </div>
 
-                    <svg className="w-full h-32 text-cyan-500 overflow-visible z-10" viewBox="0 0 100 30" preserveAspectRatio="none">
-                      <defs>
-                        <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.4" />
-                          <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
-                        </linearGradient>
-                      </defs>
-                      <path 
-                        d="M0,25 Q15,8 30,19 T60,5 T90,14 T100,8" 
-                        fill="none" 
-                        stroke="url(#chartGrad)" 
-                        strokeWidth="1.5" 
-                        strokeLinecap="round" 
-                      />
-                      <path 
-                        d="M0,25 Q15,8 30,19 T60,5 T90,14 T100,8 L100,30 L0,30 Z" 
-                        fill="url(#chartGrad)" 
-                      />
-                      {/* Dots on peak vertices */}
-                      <circle cx="30" cy="19" r="1.2" fill="#7B2FFF" className="animate-pulse" />
-                      <circle cx="60" cy="5" r="1.2" fill="#00D4FF" className="animate-pulse" />
-                      <circle cx="90" cy="14" r="1.2" fill="#a855f7" className="animate-pulse" />
-                    </svg>
+                    {clientOrders.length === 0 ? (
+                      <div className="w-full flex items-center justify-center h-32 text-center">
+                        <p className="text-[10px] text-gray-600 italic">{currentLanguage === 'TR' ? 'Henüz sipariş bulunmuyor.' : 'No orders yet.'}</p>
+                      </div>
+                    ) : (
+                      <svg className="w-full h-32 text-cyan-500 overflow-visible z-10" viewBox="0 0 100 30" preserveAspectRatio="none">
+                        <defs>
+                          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        <path 
+                          d={trendSvgPath.line}
+                          fill="none" 
+                          stroke="url(#chartGrad)" 
+                          strokeWidth="1.5" 
+                          strokeLinecap="round" 
+                        />
+                        <path 
+                          d={trendSvgPath.area}
+                          fill="url(#chartGrad)" 
+                        />
+                        {trendSvgPath.dots.map((dot, i) => (
+                          <circle key={i} cx={dot.x} cy={dot.y} r="1.2" fill={i % 2 === 0 ? "#7B2FFF" : "#00D4FF"} className="animate-pulse" />
+                        ))}
+                      </svg>
+                    )}
 
                     <div className="flex justify-between text-[9px] text-gray-500 font-mono mt-3 border-t border-white/5 pt-2 z-10">
-                      <span>{currentLanguage === 'TR' ? '01 Haz' : 'Jun 01'}</span>
-                      <span>{currentLanguage === 'TR' ? '08 Haz' : 'Jun 08'}</span>
-                      <span>{currentLanguage === 'TR' ? '15 Haz' : 'Jun 15'}</span>
-                      <span>{currentLanguage === 'TR' ? '22 Haz' : 'Jun 22'}</span>
-                      <span>{currentLanguage === 'TR' ? 'Bugün' : 'Today'}</span>
+                      {monthlyTrendData.map((d, i) => (
+                        <span key={i}>{d.label}</span>
+                      ))}
                     </div>
                   </div>
 
@@ -1179,11 +1233,7 @@ export const ClientDashboard: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-gray-300 font-medium leading-relaxed">
-                    {services
-                      .filter(s => s.status === 'active')
-                      .filter(s => selectedServicePlatformFilter === 'All' || s.platform === selectedServicePlatformFilter)
-                      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()))
-                      .map((ser, idx) => (
+                    {paginatedCatalogServices.map((ser, idx) => (
                         <tr key={ser.id} className="hover:bg-white/1 transition-colors">
                           <td className="py-3 px-3 font-mono text-cyan-400 font-bold">#{idx + 1}</td>
                           <td className="py-3 px-3">
@@ -1209,6 +1259,44 @@ export const ClientDashboard: React.FC = () => {
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls */}
+              {catalogTotalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t border-white/5">
+                  <p className="text-[10px] text-gray-500">
+                    {filteredCatalogServices.length} {currentLanguage === 'TR' ? 'hizmetten' : 'of'} {(catalogPage - 1) * CATALOG_PAGE_SIZE + 1}–{Math.min(catalogPage * CATALOG_PAGE_SIZE, filteredCatalogServices.length)} {currentLanguage === 'TR' ? 'gösteriliyor' : 'shown'}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setCatalogPage(p => Math.max(1, p - 1))}
+                      disabled={catalogPage === 1}
+                      className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold disabled:opacity-30 hover:bg-white/10 transition cursor-pointer"
+                    >
+                      {currentLanguage === 'TR' ? 'Önceki' : 'Prev'}
+                    </button>
+                    {Array.from({ length: Math.min(5, catalogTotalPages) }, (_, i) => {
+                      const page = catalogPage <= 3 ? i + 1 : catalogPage - 2 + i;
+                      if (page > catalogTotalPages) return null;
+                      return (
+                        <button
+                          key={page}
+                          onClick={() => setCatalogPage(page)}
+                          className={`w-7 h-7 rounded-lg text-xs font-bold transition cursor-pointer ${page === catalogPage ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-400' : 'bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10'}`}
+                        >
+                          {page}
+                        </button>
+                      );
+                    })}
+                    <button
+                      onClick={() => setCatalogPage(p => Math.min(catalogTotalPages, p + 1))}
+                      disabled={catalogPage === catalogTotalPages}
+                      className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs font-bold disabled:opacity-30 hover:bg-white/10 transition cursor-pointer"
+                    >
+                      {currentLanguage === 'TR' ? 'Sonraki' : 'Next'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
