@@ -103,6 +103,7 @@ interface AppContextProps {
   placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<string | null>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
+  isServerSynced: boolean;
 }
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
@@ -193,6 +194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   }, [currentClientUser]);
   
   const syncDoneRef = useRef(false);
+  const [isServerSynced, setIsServerSynced] = useState(false);
 
   const saveToApi = (key: string, value: unknown) => {
     if (!syncDoneRef.current) return;
@@ -255,6 +257,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         } catch { /* server unavailable, use localStorage */ }
       }
       syncDoneRef.current = true;
+      setIsServerSynced(true);
     };
     syncFromServer();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -1058,7 +1061,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       registerClient,
       placeClientOrder,
       submitClientPaymentRequest,
-      submitClientTicket
+      submitClientTicket,
+      isServerSynced
     }}>
       {children}
     </AppContext.Provider>

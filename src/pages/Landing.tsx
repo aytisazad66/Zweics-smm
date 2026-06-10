@@ -33,7 +33,8 @@ export const Landing: React.FC = () => {
     clientLoggedIn,
     currentClientUser,
     users,
-    showToast
+    showToast,
+    isServerSynced
   } = useAppState();
 
   const [activePlatformFilter, setActivePlatformFilter] = useState<string>('Tümü');
@@ -71,7 +72,21 @@ export const Landing: React.FC = () => {
   );
 
   // Handle Client Authentication
-  const handleAuthSubmit = (e: React.FormEvent) => {
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const doLogin = (user: { id: string; fullName: string; email: string; balance: number; totalOrders: number; joinedDate: string; status: string }) => {
+    if (user.status === 'suspended') {
+      showToast(currentLanguage === 'TR' ? 'Hesabınız askıya alınmıştır.' : 'Your account has been suspended.', 'error');
+      return;
+    }
+    setCurrentClientUser(user as any);
+    setClientLoggedIn(true);
+    setPortalMode('client');
+    setAuthModalOpen(false);
+    showToast(currentLanguage === 'TR' ? `Tekrar hoş geldiniz, Sayın ${user.fullName}!` : `Welcome back, ${user.fullName}!`, 'success');
+  };
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authTab === 'register') {
       if (!authFullName || !authEmail || !authPassword) {
@@ -89,29 +104,38 @@ export const Landing: React.FC = () => {
         return;
       }
 
-      const user = users.find(u => u.email.toLowerCase() === authEmail.toLowerCase());
-      if (user) {
-        if (user.status === 'suspended') {
-          showToast(currentLanguage === 'TR' ? 'Hesabınız askıya alınmıştır.' : 'Your account has been suspended.', 'error');
-          return;
+      const email = authEmail.toLowerCase();
+
+      // 1. Check local state first (instant)
+      const localUser = users.find(u => u.email.toLowerCase() === email);
+      if (localUser) { doLogin(localUser); return; }
+
+      // 2. Fallback: fetch directly from server (handles race condition on new devices)
+      setAuthLoading(true);
+      try {
+        const res = await fetch('/api/kv/smm_users');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.value) {
+            const serverUsers: any[] = JSON.parse(data.value);
+            const serverUser = serverUsers.find((u: any) => u.email.toLowerCase() === email);
+            if (serverUser) { doLogin(serverUser); setAuthLoading(false); return; }
+          }
         }
-        setCurrentClientUser(user);
+      } catch { /* server unavailable */ }
+      setAuthLoading(false);
+
+      // 3. Demo fallback
+      const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
+      if (isDemo || authPassword === 'password123') {
+        const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
+        setCurrentClientUser(targetUser as any);
         setClientLoggedIn(true);
         setPortalMode('client');
         setAuthModalOpen(false);
-        showToast(currentLanguage === 'TR' ? `Tekrar hoş geldiniz, Sayın ${user.fullName}!` : `Welcome back, Mr/Mrs ${user.fullName}!`, 'success');
+        showToast(currentLanguage === 'TR' ? 'Demo kullanıcı olarak giriş yapıldı.' : 'Logged in as demo client.', 'success');
       } else {
-        const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
-        if (isDemo || authPassword === 'password123') {
-          const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
-          setCurrentClientUser(targetUser);
-          setClientLoggedIn(true);
-          setPortalMode('client');
-          setAuthModalOpen(false);
-          showToast(currentLanguage === 'TR' ? 'Demo kullanıcı olarak giriş yapıldı.' : 'Logged in as demo client.', 'success');
-        } else {
-          showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı. Lütfen yeni kayıt oluşturun.' : 'Client not found. Please register.', 'error');
-        }
+        showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı. Lütfen yeni kayıt oluşturun.' : 'Client not found. Please register.', 'error');
       }
     }
   };
@@ -725,10 +749,20 @@ export const Landing: React.FC = () => {
 
               <button
                 type="submit"
-                className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                disabled={authLoading}
+                className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
               >
-                <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur' : 'Create Account')}</span>
-                <ChevronRight className="w-4 h-4" />
+                {authLoading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    <span>{currentLanguage === 'TR' ? 'Hesap aranıyor...' : 'Looking up account...'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur' : 'Create Account')}</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
             </form>
           </div>
