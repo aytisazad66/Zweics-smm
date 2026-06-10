@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAppState } from '../context/AppContext';
 import { Order, PLATFORMS } from '../data/mockData';
-import { Search, Eye, Filter, Trash2, Check, Ban, ChevronLeft, ChevronRight, CornerDownRight, X, Sparkles, Sliders } from 'lucide-react';
+import { Search, Eye, Filter, Trash2, Check, Ban, ChevronLeft, ChevronRight, CornerDownRight, X, Sparkles, Sliders, RefreshCw } from 'lucide-react';
 
 export const Orders: React.FC = () => {
   const { 
@@ -10,8 +10,11 @@ export const Orders: React.FC = () => {
     currentLanguage, 
     updateOrderStatus, 
     addNotification, 
-    showToast 
+    showToast,
+    syncProviderOrders
   } = useAppState();
+
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const [search, setSearch] = useState('');
   const [platformFilter, setPlatformFilter] = useState<string>('All');
@@ -64,6 +67,14 @@ export const Orders: React.FC = () => {
     showToast(currentLanguage === 'TR' ? 'Seçilen siparişler silindi.' : 'Selected orders removed.', 'error');
     setSelectedOrderIds([]);
   };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    await syncProviderOrders();
+    setIsSyncing(false);
+  };
+
+  const processingCount = orders.filter(o => o.status === 'İşlemde').length;
 
   return (
     <div className="space-y-6 animate-fade-in text-[#eeeeff]">
@@ -125,6 +136,23 @@ export const Orders: React.FC = () => {
               <option value="Tamamlandı">Tamamlandı</option>
               <option value="İptal">İptal</option>
             </select>
+
+            {/* API Sync button */}
+            <button
+              id="sync-provider-orders-btn"
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600/30 to-purple-600/30 border border-cyan-500/30 hover:border-cyan-400/60 text-cyan-300 hover:text-white text-xs font-bold rounded-xl transition-all duration-150 active:scale-95 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
+              <span>
+                {isSyncing
+                  ? (currentLanguage === 'TR' ? 'Senkronize ediliyor...' : 'Syncing...')
+                  : (currentLanguage === 'TR'
+                    ? `API Senkronize Et${processingCount > 0 ? ` (${processingCount})` : ''}`
+                    : `Sync API${processingCount > 0 ? ` (${processingCount})` : ''}`)}
+              </span>
+            </button>
           </div>
         </div>
 

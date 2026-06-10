@@ -87,6 +87,7 @@ interface AppContextProps {
   updateApiProviderStatus: (id: string, status: boolean) => void;
   updateApiProvider: (id: string, name: string, url: string, key: string) => void;
   testApiProvider: (id: string) => Promise<boolean>;
+  syncProviderOrders: () => Promise<void>;
   
   toastMsg: { text: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (text: string, type?: 'success' | 'error' | 'info') => void;
@@ -531,6 +532,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
+  const syncProviderOrders = async (): Promise<void> => {
+    const activeOrders = orders.filter(o => o.status === 'İşlemde' && o.providerOrderId && o.providerApiId);
+    if (activeOrders.length === 0) {
+      showToast(
+        currentLanguage === 'TR' ? 'Senkronize edilecek aktif sipariş yok.' : 'No active orders to sync.',
+        'info'
+      );
+      return;
+    }
+
+    let updatedCount = 0;
+    let completedCount = 0;
+
+    for (const order of activeOrders) {
+      const provider = apiProviders.find(p => p.id === order.providerApiId && p.status && p.key && p.key.trim() !== '');
+      if (!provider) continue;
+
+      try {
+        const result = await callProviderApi(provider, {
+          key: provider.key,
+          action: 'status',
+          order: order.providerOrderId!,
+        });
+
+        if (!result || !result.status) continue;
+
+        const rawStatus: string = result.status;
+        let newStatus: Order['status'] | null = null;
+
+        if (rawStatus === 'Completed' || rawStatus === 'Partial') {
+          newStatus = 'Tamamlandı';
+          completedCount++;
+        } else if (rawStatus === 'Cancelled') {
+          newStatus = 'İptal';
+        } else if (rawStatus === 'In progress') {
+          newStatus = 'İşlemde';
+        } else if (rawStatus === 'Pending') {
+          newStatus = 'Bekliyor';
+        }
+
+        if (newStatus && newStatus !== order.status) {
+          const logText = newStatus === 'Tamamlandı'
+            ? `✅ Sipariş tamamlandı. Sağlayıcı onayladı. (${rawStatus})`
+            : newStatus === 'İptal'
+            ? `❌ Sipariş sağlayıcı tarafından iptal edildi. (${rawStatus})`
+            : `🔄 Sipariş durumu güncellendi: ${rawStatus}`;
+
+          setOrders(prev => prev.map(o => {
+            if (o.id === order.id) {
+              return {
+                ...o,
+                status: newStatus!,
+                logs: [...o.logs, {
+                  time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
+                  text: logText,
+                }],
+              };
+            }
+            return o;
+          }));
+          updatedCount++;
+        }
+      } catch {
+        // Network error for this specific order — skip it
+      }
+    }
+
+    if (updatedCount > 0) {
+      showToast(
+        currentLanguage === 'TR'
+          ? `✅ ${updatedCount} sipariş senkronize edildi. ${completedCount > 0 ? `${completedCount} sipariş tamamlandı!` : ''}`
+          : `✅ ${updatedCount} orders synced. ${completedCount > 0 ? `${completedCount} completed!` : ''}`,
+        'success'
+      );
+      if (completedCount > 0) {
+        addNotification(
+          currentLanguage === 'TR'
+            ? `${completedCount} sipariş başarıyla tamamlandı.`
+            : `${completedCount} orders completed.`,
+          'info'
+        );
+      }
+    } else {
+      showToast(
+        currentLanguage === 'TR' ? 'Tüm siparişler güncel durumda.' : 'All orders are up to date.',
+        'info'
+      );
+    }
+  };
+
   const detectPlatformFromName = (name: string, category: string): Service['platform'] => {
     const combined = `${name} ${category}`.toLowerCase();
     if (combined.includes('tiktok') || combined.includes('tik tok')) return 'TikTok';
@@ -705,7 +796,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let finalStatus: Order['status'] = 'Bekliyor';
 
     if (service.providerServiceId && service.providerApiId) {
-      const provider = apiProviders.find(p => p.id === service.providerApiId && p.isActive && p.key && p.key.trim() !== '');
+      const provider = apiProviders.find(p => p.id === service.providerApiId && p.status && p.key && p.key.trim() !== '');
       if (provider) {
         orderLogs.push({ time: nowTime, text: 'Sipariş işleme alınıyor...' });
         try {
@@ -887,7 +978,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       toggleServiceStatus, addService, updateService, deleteService, reorderServices,
       replyTicket, toggleTicketStatus,
       approvePaymentRequest, rejectPaymentRequest, togglePaymentMethod, updatePaymentMethodCommission, updatePaymentMethodDetails,
-      updateApiProviderStatus, updateApiProvider, testApiProvider, importServicesFromApi,
+      updateApiProviderStatus, updateApiProvider, testApiProvider, importServicesFromApi, syncProviderOrders,
       toastMsg, showToast,
 
       // Expose newly created client variables and methods
