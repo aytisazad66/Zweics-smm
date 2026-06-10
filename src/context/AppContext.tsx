@@ -192,7 +192,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [currentClientUser]);
   
+  const syncDoneRef = useRef(false);
+
   const saveToApi = (key: string, value: unknown) => {
+    if (!syncDoneRef.current) return;
     fetch(`/api/kv/${key}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -251,6 +254,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         } catch { /* server unavailable, use localStorage */ }
       }
+      syncDoneRef.current = true;
     };
     syncFromServer();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

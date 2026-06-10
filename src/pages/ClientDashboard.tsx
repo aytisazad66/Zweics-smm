@@ -226,24 +226,109 @@ export const ClientDashboard: React.FC = () => {
     return { line, area, dots, coords };
   }, [monthlyTrendData]);
 
+  // Smart order field config based on service name
+  const getOrderInputConfig = (serviceName: string, platform: string) => {
+    const n = serviceName.toLowerCase();
+    const isFollower = (n.includes('takipçi') || n.includes('follower') || n.includes('follow') || n.includes('abone')) && !n.includes('reel') && !n.includes('video') && !n.includes('post') && !n.includes('hikaye') && !n.includes('story');
+    const isStory = n.includes('hikaye') || n.includes('story');
+    const isReels = n.includes('reels') || n.includes('reel') || n.includes('kısa video');
+    const isVideo = n.includes('izlenme') || n.includes('view') || n.includes('watch') || (n.includes('video') && !isReels);
+
+    if (isFollower && platform !== 'YouTube') {
+      return {
+        needsLink: false,
+        needsUsername: true,
+        linkLabel: '',
+        linkPlaceholder: '',
+        usernameLabel: currentLanguage === 'TR' ? 'Kullanıcı Adı (@ olmadan)' : 'Username (without @)',
+        usernamePlaceholder: platform === 'Telegram' ? 'kanaladi' : 'ornekkullanici',
+      };
+    }
+
+    let linkLabel = currentLanguage === 'TR' ? 'Gönderi / Paylaşım Linki' : 'Post / Content Link';
+    let linkPlaceholder = `https://www.${platform.toLowerCase()}.com/...`;
+
+    if (isStory) {
+      linkLabel = currentLanguage === 'TR' ? 'Hikaye Linki' : 'Story Link';
+      linkPlaceholder = 'https://www.instagram.com/stories/kullaniciadi/12345/';
+    } else if (isReels) {
+      linkLabel = currentLanguage === 'TR' ? 'Reels / Kısa Video Linki' : 'Reels Link';
+      linkPlaceholder = 'https://www.instagram.com/reel/XXXXXXXXXXX/';
+    } else if (platform === 'YouTube' && (isFollower || !isVideo)) {
+      linkLabel = currentLanguage === 'TR' ? 'YouTube Kanal Linki' : 'YouTube Channel Link';
+      linkPlaceholder = 'https://www.youtube.com/@kanaladi';
+    } else if (platform === 'YouTube' && isVideo) {
+      linkLabel = currentLanguage === 'TR' ? 'YouTube Video Linki' : 'YouTube Video Link';
+      linkPlaceholder = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
+    } else if (platform === 'TikTok' && isVideo) {
+      linkLabel = currentLanguage === 'TR' ? 'TikTok Video Linki' : 'TikTok Video Link';
+      linkPlaceholder = 'https://www.tiktok.com/@kullanici/video/1234567890';
+    } else if (platform === 'Telegram') {
+      linkLabel = currentLanguage === 'TR' ? 'Telegram Kanal / Grup Linki' : 'Telegram Channel / Group Link';
+      linkPlaceholder = 'https://t.me/kanaladi';
+    } else if (platform === 'Spotify') {
+      linkLabel = currentLanguage === 'TR' ? 'Spotify Parça / Profil Linki' : 'Spotify Track / Profile Link';
+      linkPlaceholder = 'https://open.spotify.com/track/...';
+    } else if (platform === 'Instagram') {
+      linkLabel = currentLanguage === 'TR' ? 'Instagram Gönderi Linki' : 'Instagram Post Link';
+      linkPlaceholder = 'https://www.instagram.com/p/XXXXXXXXXXX/';
+    }
+
+    return { needsLink: true, needsUsername: false, linkLabel, linkPlaceholder, usernameLabel: '', usernamePlaceholder: '' };
+  };
+
+  const validateOrderLink = (link: string, platform: string): string | null => {
+    try {
+      const url = new URL(link);
+      const domains: Record<string, string[]> = {
+        Instagram: ['instagram.com'],
+        TikTok: ['tiktok.com'],
+        YouTube: ['youtube.com', 'youtu.be'],
+        Twitter: ['twitter.com', 'x.com'],
+        Telegram: ['t.me', 'telegram.me', 'telegram.org'],
+        Spotify: ['spotify.com'],
+      };
+      const allowed = domains[platform];
+      if (allowed && !allowed.some(d => url.hostname.includes(d))) {
+        return currentLanguage === 'TR'
+          ? `Bu servis ${platform} linki gerektiriyor. (${allowed[0]})`
+          : `This service requires a ${platform} link. (${allowed[0]})`;
+      }
+    } catch {
+      return currentLanguage === 'TR' ? 'Geçersiz URL. https:// ile başlamalı.' : 'Invalid URL. Must start with https://';
+    }
+    return null;
+  };
+
+  const orderInputConfig = activeServiceObj ? getOrderInputConfig(activeServiceObj.name, activeServiceObj.platform) : null;
+
   // Simulation handlers
   const handlePlaceOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedServiceId || orderQuantity <= 0 || !orderLink) {
+    const cfg = orderInputConfig;
+    const needsLink = !cfg || cfg.needsLink;
+    const needsUsername = cfg?.needsUsername;
+
+    if (!selectedServiceId || orderQuantity <= 0 || (needsLink && !orderLink) || (needsUsername && !orderUsername)) {
       showToast(currentLanguage === 'TR' ? 'Lütfen form alanlarını eksiksiz doldurun.' : 'Please fully fill in form components.', 'error');
       return;
     }
+    if (needsLink && orderLink) {
+      const linkErr = validateOrderLink(orderLink, activeServiceObj!.platform);
+      if (linkErr) { showToast(linkErr, 'error'); return; }
+    }
     if (activeServiceObj && (orderQuantity < activeServiceObj.min || orderQuantity > activeServiceObj.max)) {
       showToast(
-        currentLanguage === 'TR' 
-          ? `Miktar hatası! Bu servis için sınır: ${activeServiceObj.min} - ${activeServiceObj.max}` 
-          : `Quantity boundary alert! This service supports: ${activeServiceObj.min} - ${activeServiceObj.max}`, 
+        currentLanguage === 'TR'
+          ? `Miktar hatası! Bu servis için sınır: ${activeServiceObj.min} - ${activeServiceObj.max}`
+          : `Quantity boundary alert! This service supports: ${activeServiceObj.min} - ${activeServiceObj.max}`,
         'error'
       );
       return;
     }
 
-    const newOrderId = await placeClientOrder(selectedServiceId, orderQuantity, orderLink, orderUsername);
+    const targetLink = needsUsername ? `https://profile/${orderUsername}` : orderLink;
+    const newOrderId = await placeClientOrder(selectedServiceId, orderQuantity, targetLink, orderUsername);
     if (newOrderId) {
       setOrderLink('');
       setOrderUsername('');
@@ -614,16 +699,6 @@ export const ClientDashboard: React.FC = () => {
             <span>{currentLanguage}</span>
           </button>
 
-          <button
-            onClick={() => {
-              setPortalMode('landing');
-              showToast(currentLanguage === 'TR' ? 'Ana tanıtım sayfasına dönüldü.' : 'Redirected to Landing Page.', 'info');
-            }}
-            className="text-gray-400 hover:text-white font-bold cursor-pointer hidden md:block"
-          >
-            {currentLanguage === 'TR' ? 'Tanıtım Sayfası' : 'Landing'}
-          </button>
-          
           <button
             onClick={() => {
               setPortalMode('admin');
@@ -1070,55 +1145,70 @@ export const ClientDashboard: React.FC = () => {
                     </select>
                   </div>
 
-                  {/* Target link and profile identifier */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    
+                  {/* Smart input fields based on service type */}
+                  {orderInputConfig?.needsUsername ? (
                     <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Kanal / Paylaşım Bağlantı Linki (URL)' : 'Target Link URL'}</label>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        {orderInputConfig.usernameLabel}
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">@</span>
+                        <input
+                          id="client-order-username"
+                          type="text"
+                          required
+                          placeholder={orderInputConfig.usernamePlaceholder}
+                          className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 pl-8 pr-4 text-white focus:outline-none focus:border-cyan-400 transition"
+                          value={orderUsername}
+                          onChange={(e) => setOrderUsername(e.target.value.replace(/^@/, ''))}
+                        />
+                      </div>
+                      <p className="text-[10px] text-gray-600">@ işareti olmadan sadece kullanıcı adını girin.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                        {orderInputConfig?.linkLabel || (currentLanguage === 'TR' ? 'İçerik Linki' : 'Content Link')}
+                      </label>
                       <input
                         id="client-order-link"
                         type="url"
                         required
-                        placeholder="https://..."
+                        placeholder={orderInputConfig?.linkPlaceholder || 'https://...'}
                         className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-400 transition"
                         value={orderLink}
                         onChange={(e) => setOrderLink(e.target.value)}
                       />
+                      {orderLink && validateOrderLink(orderLink, activeServiceObj?.platform || '') && (
+                        <p className="text-[10px] text-red-400 font-bold flex items-center gap-1">
+                          ⚠ {validateOrderLink(orderLink, activeServiceObj?.platform || '')}
+                        </p>
+                      )}
                     </div>
+                  )}
 
-                    <div className="space-y-1.5">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Hedef Kullanıcı Adı' : 'Target Username'}</label>
-                      <input
-                        id="client-order-username"
-                        type="text"
-                        placeholder="örn: salihmusic"
-                        className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-cyan-400 transition"
-                        value={orderUsername}
-                        onChange={(e) => setOrderUsername(e.target.value)}
-                      />
-                    </div>
-
-                  </div>
-
-                  {/* Quantity input component with slider speed */}
+                  {/* Quantity input — fixed leading-zero bug */}
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Gönderilecek Hedef Miktar' : 'SMM Order Quantity'}</label>
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Gönderilecek Miktar' : 'SMM Order Quantity'}</label>
                       {activeServiceObj && (
                         <span className="text-[10px] text-gray-500 font-bold bg-white/2 px-2 py-0.5 rounded border border-white/5">
-                          {currentLanguage === 'TR' ? `Limitler: Min ${activeServiceObj.min} - Max ${activeServiceObj.max}` : `Limits: Min ${activeServiceObj.min} - Max ${activeServiceObj.max}`}
+                          {currentLanguage === 'TR' ? `Min ${activeServiceObj.min} — Max ${activeServiceObj.max}` : `Min ${activeServiceObj.min} — Max ${activeServiceObj.max}`}
                         </span>
                       )}
                     </div>
                     <input
                       id="client-order-quantity"
-                      type="number"
+                      type="text"
+                      inputMode="numeric"
                       required
-                      min={activeServiceObj?.min || 100}
-                      max={activeServiceObj?.max || 50000}
                       className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 px-4 text-white font-mono text-sm focus:outline-none focus:border-cyan-400 transition"
-                      value={orderQuantity}
-                      onChange={(e) => setOrderQuantity(parseInt(e.target.value) || 0)}
+                      value={orderQuantity === 0 ? '' : orderQuantity}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setOrderQuantity(raw === '' ? 0 : parseInt(raw, 10));
+                      }}
+                      placeholder={activeServiceObj ? String(activeServiceObj.min) : '1000'}
                     />
                   </div>
 
