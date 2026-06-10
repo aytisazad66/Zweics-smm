@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import {
   Service,
   Order,
@@ -572,13 +572,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return false;
   };
 
-  const syncProviderOrders = async (): Promise<void> => {
-    const activeOrders = orders.filter(o => o.status === 'İşlemde' && o.providerOrderId && o.providerApiId);
+  const ordersRef = useRef(orders);
+  useEffect(() => { ordersRef.current = orders; }, [orders]);
+  const apiProvidersRef = useRef(apiProviders);
+  useEffect(() => { apiProvidersRef.current = apiProviders; }, [apiProviders]);
+  const currentLanguageRef = useRef(currentLanguage);
+  useEffect(() => { currentLanguageRef.current = currentLanguage; }, [currentLanguage]);
+
+  const syncProviderOrders = async (silent = false): Promise<void> => {
+    const currentOrders = ordersRef.current;
+    const currentProviders = apiProvidersRef.current;
+    const lang = currentLanguageRef.current;
+
+    const activeOrders = currentOrders.filter(o => o.status === 'İşlemde' && o.providerOrderId && o.providerApiId);
     if (activeOrders.length === 0) {
-      showToast(
-        currentLanguage === 'TR' ? 'Senkronize edilecek aktif sipariş yok.' : 'No active orders to sync.',
-        'info'
-      );
+      if (!silent) {
+        showToast(
+          lang === 'TR' ? 'Senkronize edilecek aktif sipariş yok.' : 'No active orders to sync.',
+          'info'
+        );
+      }
       return;
     }
 
@@ -586,7 +599,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     let completedCount = 0;
 
     for (const order of activeOrders) {
-      const provider = apiProviders.find(p => p.id === order.providerApiId && p.status && p.key && p.key.trim() !== '');
+      const provider = currentProviders.find(p => p.id === order.providerApiId && p.status && p.key && p.key.trim() !== '');
       if (!provider) continue;
 
       try {
@@ -598,26 +611,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (!result || !result.status) continue;
 
-        const rawStatus: string = result.status;
+        const rawStatus: string = (result.status ?? '').toString().toLowerCase();
         let newStatus: Order['status'] | null = null;
 
-        if (rawStatus === 'Completed' || rawStatus === 'Partial') {
+        if (rawStatus === 'completed' || rawStatus === 'partial') {
           newStatus = 'Tamamlandı';
           completedCount++;
-        } else if (rawStatus === 'Cancelled') {
+        } else if (rawStatus === 'cancelled' || rawStatus === 'canceled') {
           newStatus = 'İptal';
-        } else if (rawStatus === 'In progress') {
+        } else if (rawStatus === 'in progress' || rawStatus === 'processing') {
           newStatus = 'İşlemde';
-        } else if (rawStatus === 'Pending') {
+        } else if (rawStatus === 'pending') {
           newStatus = 'Bekliyor';
         }
 
         if (newStatus && newStatus !== order.status) {
           const logText = newStatus === 'Tamamlandı'
-            ? `✅ Sipariş tamamlandı. Sağlayıcı onayladı. (${rawStatus})`
+            ? `✅ Sipariş tamamlandı. Sağlayıcı onayladı. (${result.status})`
             : newStatus === 'İptal'
-            ? `❌ Sipariş sağlayıcı tarafından iptal edildi. (${rawStatus})`
-            : `🔄 Sipariş durumu güncellendi: ${rawStatus}`;
+            ? `❌ Sipariş sağlayıcı tarafından iptal edildi. (${result.status})`
+            : `🔄 Sipariş durumu güncellendi: ${result.status}`;
 
           setOrders(prev => prev.map(o => {
             if (o.id === order.id) {
@@ -641,26 +654,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (updatedCount > 0) {
       showToast(
-        currentLanguage === 'TR'
+        lang === 'TR'
           ? `✅ ${updatedCount} sipariş senkronize edildi. ${completedCount > 0 ? `${completedCount} sipariş tamamlandı!` : ''}`
           : `✅ ${updatedCount} orders synced. ${completedCount > 0 ? `${completedCount} completed!` : ''}`,
         'success'
       );
       if (completedCount > 0) {
         addNotification(
-          currentLanguage === 'TR'
+          lang === 'TR'
             ? `${completedCount} sipariş başarıyla tamamlandı.`
             : `${completedCount} orders completed.`,
           'info'
         );
       }
-    } else {
+    } else if (!silent) {
       showToast(
-        currentLanguage === 'TR' ? 'Tüm siparişler güncel durumda.' : 'All orders are up to date.',
+        lang === 'TR' ? 'Tüm siparişler güncel durumda.' : 'All orders are up to date.',
         'info'
       );
     }
   };
+
+  // Auto-poll: every 90 seconds, silently check status of "İşlemde" orders
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const hasActive = ordersRef.current.some(
+        o => o.status === 'İşlemde' && o.providerOrderId && o.providerApiId
+      );
+      if (hasActive) {
+        syncProviderOrders(true);
+      }
+    }, 90_000);
+    return () => clearInterval(interval);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const detectPlatformFromName = (name: string, category: string): Service['platform'] => {
     const combined = `${name} ${category}`.toLowerCase();

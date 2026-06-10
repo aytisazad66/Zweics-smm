@@ -119,10 +119,10 @@ export default defineConfig(() => {
     server: {
       host: '0.0.0.0',
       port: 5000,
-      allowedHosts: true,
+      allowedHosts: true as const,
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {
-        ignored: ['**/data/**', '**/.local/**', '**/node_modules/**'],
+        ignored: ['**/data/**', '**/.local/**', '**/.cache/**', '**/node_modules/**'],
       },
     },
   };
