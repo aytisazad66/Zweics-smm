@@ -206,7 +206,7 @@ export const Tickets: React.FC = () => {
                       <div className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center ${isAdminMsg ? 'bg-purple-600 text-white' : 'bg-cyan-950/40 text-cyan-400 border border-cyan-800/30'}`}>
                         {isAdminMsg ? 'AD' : msg.senderName.substring(0,2).toUpperCase()}
                       </div>
-                      <div className="max-w-[75%] space-y-1">
+                      <div className="max-w-[90%] space-y-1">
                         <span className={`text-[10px] text-gray-500 block ${isAdminMsg ? 'text-right' : ''}`}>
                           {msg.senderName} • {msg.time}
                         </span>

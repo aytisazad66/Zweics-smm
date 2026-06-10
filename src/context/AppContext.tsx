@@ -99,7 +99,7 @@ interface AppContextProps {
   clientLoggedIn: boolean;
   setClientLoggedIn: (val: boolean) => void;
   registerClient: (fullName: string, email: string) => boolean;
-  placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<boolean>;
+  placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<string | null>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
 }
@@ -658,15 +658,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
-  const placeClientOrder = async (serviceId: string, quantity: number, link: string, username: string): Promise<boolean> => {
+  const placeClientOrder = async (serviceId: string, quantity: number, link: string, username: string): Promise<string | null> => {
     if (!currentClientUser) {
       showToast(currentLanguage === 'TR' ? 'Lütfen giriş yapın.' : 'Please log in.', 'error');
-      return false;
+      return null;
     }
     const service = services.find(s => s.id === serviceId);
     if (!service) {
       showToast(currentLanguage === 'TR' ? 'Geçersiz servis.' : 'Invalid service.', 'error');
-      return false;
+      return null;
     }
     const cost = parseFloat(((service.pricePer1000 * quantity) / 1000).toFixed(2));
     if (currentClientUser.balance < cost) {
@@ -676,7 +676,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           : `Insufficient funds! This costs ${cost} TL, your balance is ${currentClientUser.balance} TL.`,
         'error'
       );
-      return false;
+      return null;
     }
 
     const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
@@ -758,7 +758,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             setOrders(prev => [cancelledOrder, ...prev]);
             addNotification(`Sipariş başarısız: ${service.name.substring(0, 20)}`, 'error');
-            return false;
+            return null;
           } else {
             // Unexpected response — keep as Bekliyor, admin will handle
             orderLogs.push({ time: nowTime, text: '⚠️ Sipariş kuyruğa alındı, işleme devam ediyor.' });
@@ -814,7 +814,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         'info'
       );
     }
-    return true;
+    return newOrderId;
   };
 
   const submitClientPaymentRequest = (amount: number, methodId: string) => {

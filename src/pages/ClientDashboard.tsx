@@ -79,7 +79,7 @@ export const ClientDashboard: React.FC = () => {
   // Add Funds States
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>(paymentMethods[0]?.id || '1');
   const [depositAmount, setDepositAmount] = useState<string>('150');
-  const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string } | null>(null);
+  const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string; methodId: string; confirmed: boolean } | null>(null);
   const [copiedInstructions, setCopiedInstructions] = useState(false);
 
   // Support Tickets States
@@ -192,12 +192,12 @@ export const ClientDashboard: React.FC = () => {
       return;
     }
 
-    const success = await placeClientOrder(selectedServiceId, orderQuantity, orderLink, orderUsername);
-    if (success) {
+    const newOrderId = await placeClientOrder(selectedServiceId, orderQuantity, orderLink, orderUsername);
+    if (newOrderId) {
       setOrderLink('');
       setOrderUsername('');
       setActiveTab('my-orders');
-      setExpandedOrderId(orders[0]?.id || null);
+      setExpandedOrderId(newOrderId);
     }
   };
 
@@ -209,12 +209,12 @@ export const ClientDashboard: React.FC = () => {
       return;
     }
     const method = paymentMethods.find(m => m.id === selectedPaymentMethodId);
-    submitClientPaymentRequest(val, selectedPaymentMethodId);
-    setDepositAmount('150');
     setDepositConfirm({
       amount: val,
       methodName: method?.name || selectedPaymentMethodId,
       instructions: method?.instructions || '',
+      methodId: selectedPaymentMethodId,
+      confirmed: false,
     });
   };
 
@@ -1171,7 +1171,7 @@ export const ClientDashboard: React.FC = () => {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-white/2 border-b border-white/5 text-gray-500 font-bold uppercase tracking-wider text-[9px]">
-                      <th className="py-3 px-3">ID</th>
+                      <th className="py-3 px-3">#</th>
                       <th className="py-3 px-3">{currentLanguage === 'TR' ? 'Hizmet Detayları' : 'Specific Package Detail'}</th>
                       <th className="py-3 px-3">{currentLanguage === 'TR' ? 'Min / Max Limit' : 'Min / Max Scope'}</th>
                       <th className="py-3 px-3 text-right">{currentLanguage === 'TR' ? 'Birim Fiyat' : 'Price /1k'}</th>
@@ -1182,10 +1182,10 @@ export const ClientDashboard: React.FC = () => {
                     {services
                       .filter(s => s.status === 'active')
                       .filter(s => selectedServicePlatformFilter === 'All' || s.platform === selectedServicePlatformFilter)
-                      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()) || s.id.includes(servicesSearch))
-                      .map(ser => (
+                      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()))
+                      .map((ser, idx) => (
                         <tr key={ser.id} className="hover:bg-white/1 transition-colors">
-                          <td className="py-3 px-3 font-mono text-cyan-400 font-bold">#{ser.id}</td>
+                          <td className="py-3 px-3 font-mono text-cyan-400 font-bold">#{idx + 1}</td>
                           <td className="py-3 px-3">
                             <span className="text-white font-bold block">{ser.name}</span>
                             <span className="text-[10px] text-gray-500 mt-0.5 block line-clamp-1">{ser.description}</span>
@@ -1468,10 +1468,10 @@ export const ClientDashboard: React.FC = () => {
                   )}
                 </div>
 
-                <div className="mt-4 p-3 bg-purple-950/20 border border-purple-500/15 rounded-2xl text-[10px] text-purple-300 leading-relaxed">
+                <div className="mt-4 p-3 bg-blue-950/20 border border-blue-500/15 rounded-2xl text-[10px] text-blue-300 leading-relaxed">
                   {currentLanguage === 'TR' 
-                    ? '⚠️ Not: Oluşturulan ödeme taleplerini, Admin Paneline geçip "Ödeme / Finans" sayfasından simülasyon amaçlı anında onaylayabilir veya reddedebilirsiniz!'
-                    : '⚠️ Note: Approve or reject these simulator requests inside Admin under "Finance & Ledger" section!'}
+                    ? '📌 Ödeme yaptıktan sonra talebin durumu "Beklemede" olarak gözükür. Admin onayladığında bakiyeniz otomatik yüklenecektir.'
+                    : '📌 After you send the payment, your request appears as "Pending". Balance is added once the admin approves it.'}
                 </div>
               </div>
 
@@ -1952,12 +1952,33 @@ export const ClientDashboard: React.FC = () => {
                 : '📌 Send exactly ₺' + depositConfirm.amount.toFixed(2) + ' to the account above. Include your username in the description. Our team will approve your balance after verifying the transfer.'}
             </div>
 
-            <button
-              onClick={() => setDepositConfirm(null)}
-              className="w-full py-3 bg-gradient-to-r from-cyan-500 to-purple-600 font-bold text-white rounded-2xl active:scale-95 transition cursor-pointer"
-            >
-              {currentLanguage === 'TR' ? 'Tamam, Anladım' : 'Got it, I\'ll transfer now'}
-            </button>
+            {!depositConfirm.confirmed ? (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setDepositConfirm(null)}
+                  className="flex-1 py-3 bg-white/5 border border-white/10 font-bold text-gray-300 rounded-2xl active:scale-95 transition cursor-pointer hover:bg-white/10"
+                >
+                  {currentLanguage === 'TR' ? 'İptal' : 'Cancel'}
+                </button>
+                <button
+                  onClick={() => {
+                    submitClientPaymentRequest(depositConfirm.amount, depositConfirm.methodId);
+                    setDepositConfirm(prev => prev ? { ...prev, confirmed: true } : null);
+                    setDepositAmount('150');
+                  }}
+                  className="flex-1 py-3 bg-gradient-to-r from-cyan-500 to-purple-600 font-bold text-white rounded-2xl active:scale-95 transition cursor-pointer"
+                >
+                  {currentLanguage === 'TR' ? '✓ Ödeme Talebini Oluştur' : '✓ Create Payment Request'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setDepositConfirm(null)}
+                className="w-full py-3 bg-gradient-to-r from-green-500 to-emerald-600 font-bold text-white rounded-2xl active:scale-95 transition cursor-pointer"
+              >
+                {currentLanguage === 'TR' ? '✓ Tamam, Anladım' : '✓ Got it, I\'ll transfer now'}
+              </button>
+            )}
 
           </div>
         </div>

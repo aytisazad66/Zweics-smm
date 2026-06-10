@@ -234,7 +234,10 @@ export const initialServices: Service[] = [
   }
 ];
 
-export const initialOrders: Order[] = [
+export const initialOrders: Order[] = [];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _removedDemoOrders = [
   {
     id: "S-87910",
     username: "mehmet_can",
@@ -408,7 +411,10 @@ export const initialOrders: Order[] = [
   }
 ];
 
-export const initialUsers: User[] = [
+export const initialUsers: User[] = [];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _removedDemoUsers = [
   {
     id: "U001",
     fullName: "Mehmet Can Öztürk",
@@ -493,7 +499,10 @@ export const initialPaymentMethods: PaymentMethod[] = [
   { id: "other1", name: "Diğer Ödeme Yöntemi", status: false, commission: 0, minAmount: 50, instructions: "" },
 ];
 
-export const initialPaymentRequests: PaymentRequest[] = [
+export const initialPaymentRequests: PaymentRequest[] = [];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _removedDemoPayments = [
   {
     id: "P-401",
     userId: "U001",
@@ -554,7 +563,10 @@ export const initialPaymentRequests: PaymentRequest[] = [
   }
 ];
 
-export const initialTickets: Ticket[] = [
+export const initialTickets: Ticket[] = [];
+
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _removedDemoTickets = [
   {
     id: "T-501",
     userId: "U001",
