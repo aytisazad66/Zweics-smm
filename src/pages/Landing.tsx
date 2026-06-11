@@ -57,10 +57,16 @@ export const Landing: React.FC = () => {
   const [forgotOtpInput, setForgotOtpInput] = useState('');
   const [forgotOtpError, setForgotOtpError] = useState(false);
   const [forgotOtpLoading, setForgotOtpLoading] = useState(false);
+  const [forgotMailError, setForgotMailError] = useState('');
+  const [forgotFallbackCode, setForgotFallbackCode] = useState('');
+
+  const otpKey = (email: string) => 'smm_otp_' + email.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
   const handleForgotSend = async () => {
     if (!forgotEmail) return;
     setForgotLoading(true);
+    setForgotMailError('');
+    setForgotFallbackCode('');
 
     // Check user exists
     let foundUser: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
@@ -80,21 +86,23 @@ export const Landing: React.FC = () => {
       return;
     }
 
-    // Generate 6-digit OTP
+    // Generate 6-digit OTP and save to KV
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = Date.now() + 10 * 60 * 1000; // 10 min
     try {
-      await fetch('/api/kv/smm_otp_' + btoa(forgotEmail.toLowerCase()).replace(/=/g, ''), {
+      await fetch('/api/kv/' + otpKey(forgotEmail), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ value: JSON.stringify({ otp, expiry }) })
       });
     } catch {}
 
+    // Try to send email
     const smtpReady = !!(smtpConfig?.host && smtpConfig?.user && smtpConfig?.pass);
+    let mailSent = false;
     if (smtpReady) {
       try {
-        await fetch('/api/mail', {
+        const mailRes = await fetch('/api/mail', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -122,11 +130,27 @@ export const Landing: React.FC = () => {
             from_name: smtpConfig.fromName || 'Bor Media'
           })
         });
-      } catch {}
+        const mailJson = await mailRes.json();
+        if (mailJson.ok) {
+          mailSent = true;
+        } else {
+          setForgotMailError(mailJson.message || 'Mail gönderilemedi.');
+          setForgotFallbackCode(otp);
+        }
+      } catch (e: any) {
+        setForgotMailError(e?.message || 'SMTP bağlantı hatası.');
+        setForgotFallbackCode(otp);
+      }
+    } else {
+      // No SMTP configured — show code on screen
+      setForgotFallbackCode(otp);
     }
 
     setForgotLoading(false);
     setForgotOtpMode(true);
+    if (mailSent) {
+      showToast(currentLanguage === 'TR' ? 'Doğrulama kodu e-posta adresinize gönderildi.' : 'Verification code sent to your email.', 'success');
+    }
   };
 
   const handleForgotVerifyOtp = async () => {
@@ -134,7 +158,7 @@ export const Landing: React.FC = () => {
     setForgotOtpLoading(true);
     setForgotOtpError(false);
     try {
-      const key = 'smm_otp_' + btoa(forgotEmail.toLowerCase()).replace(/=/g, '');
+      const key = otpKey(forgotEmail);
       const res = await fetch('/api/kv/' + key);
       if (res.ok) {
         const d = await res.json();
@@ -885,18 +909,35 @@ export const Landing: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    <div className="text-center space-y-1 pb-1">
-                      <p className="text-[11px] text-gray-400">
+                    {/* Mail error — show code on screen */}
+                    {forgotFallbackCode ? (
+                      <div className="rounded-xl border border-amber-600/40 bg-amber-950/20 px-4 py-3 space-y-2">
+                        {forgotMailError ? (
+                          <p className="text-[10px] text-amber-400 font-semibold">
+                            ⚠️ {currentLanguage === 'TR' ? 'Mail gönderilemedi:' : 'Mail failed:'} {forgotMailError}
+                          </p>
+                        ) : (
+                          <p className="text-[10px] text-amber-400 font-semibold">
+                            ⚠️ {currentLanguage === 'TR' ? 'SMTP ayarı yapılmamış.' : 'SMTP not configured.'}
+                          </p>
+                        )}
+                        <p className="text-[10px] text-gray-400">
+                          {currentLanguage === 'TR' ? 'Giriş kodunuz:' : 'Your login code:'}
+                        </p>
+                        <div className="text-center py-1">
+                          <span className="text-2xl font-black tracking-[10px] text-cyan-400 font-mono">{forgotFallbackCode}</span>
+                        </div>
+                        <p className="text-[9px] text-gray-500 text-center">
+                          {currentLanguage === 'TR' ? 'Bu kodu aşağıya girin ve giriş yapın.' : 'Enter this code below to log in.'}
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-400 text-center">
                         {currentLanguage === 'TR' ? `6 haneli kod ` : `6-digit code sent to `}
                         <strong className="text-white">{forgotEmail}</strong>
                         {currentLanguage === 'TR' ? ` adresine gönderildi.` : `.`}
                       </p>
-                      {!smtpConfig?.host && (
-                        <p className="text-[10px] text-amber-400 bg-amber-950/30 border border-amber-700/30 rounded-xl px-3 py-2 mt-2">
-                          ⚠️ {currentLanguage === 'TR' ? 'SMTP ayarı olmadığı için kodu sunucu loglarından alabilirsiniz. (Geliştirme modu)' : 'No SMTP configured — check server logs for the code. (Dev mode)'}
-                        </p>
-                      )}
-                    </div>
+                    )}
                     <div className="space-y-1">
                       <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? '6 Haneli Kod' : '6-Digit Code'}</label>
                       <input
@@ -921,7 +962,7 @@ export const Landing: React.FC = () => {
                         <span>{currentLanguage === 'TR' ? 'Kodu Doğrula & Giriş Yap' : 'Verify Code & Login'}</span>
                       )}
                     </button>
-                    <button type="button" onClick={() => { setForgotOtpMode(false); setForgotOtpInput(''); setForgotOtpError(false); }} className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition">
+                    <button type="button" onClick={() => { setForgotOtpMode(false); setForgotOtpInput(''); setForgotOtpError(false); setForgotFallbackCode(''); setForgotMailError(''); }} className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition">
                       {currentLanguage === 'TR' ? '← E-postayı değiştir' : '← Change email'}
                     </button>
                   </>
