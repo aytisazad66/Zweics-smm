@@ -186,20 +186,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Admin session persistence — survive F5 / hard refresh (8h TTY)
   useEffect(() => {
     if (isLoggedIn) {
-      const session = JSON.parse(localStorage.getItem('bm_admin_session') || '{}');
-      localStorage.setItem('bm_admin_session', JSON.stringify({
+      const session = JSON.parse(sessionStorage.getItem('bm_admin_session') || '{}');
+      sessionStorage.setItem('bm_admin_session', JSON.stringify({
         ...session,
         isLoggedIn: true,
         expiry: Date.now() + 8 * 3600_000
       }));
     } else {
-      localStorage.removeItem('bm_admin_session');
+      sessionStorage.removeItem('bm_admin_session');
     }
   }, [isLoggedIn]);
 
   useEffect(() => {
     if (is2FAVerified && isLoggedIn) {
-      localStorage.setItem('bm_admin_session', JSON.stringify({
+      sessionStorage.setItem('bm_admin_session', JSON.stringify({
         isLoggedIn: true,
         is2FAVerified: true,
         expiry: Date.now() + 8 * 3600_000
@@ -253,7 +253,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       } catch {}
 
       // Restore client session: only a user ID is persisted locally
-      const storedUserId = localStorage.getItem('smm_client_user_id');
+      const storedUserId = sessionStorage.getItem('smm_client_user_id');
       if (storedUserId) {
         const usersToSearch: User[] = loadedUsers ?? initialUsers;
         const user = usersToSearch.find(u => u.id === storedUserId);
@@ -262,13 +262,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           setClientLoggedIn(true);
           setPortalMode('client');
         } else {
-          localStorage.removeItem('smm_client_user_id');
+          sessionStorage.removeItem('smm_client_user_id');
         }
       }
 
       // Restore admin session (overrides client if admin was logged in)
       try {
-        const raw = localStorage.getItem('bm_admin_session');
+        const raw = sessionStorage.getItem('bm_admin_session');
         if (raw) {
           const session = JSON.parse(raw);
           if (session.expiry > Date.now()) {
@@ -280,10 +280,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               setIs2FAVerified(true);
             }
           } else {
-            localStorage.removeItem('bm_admin_session');
+            sessionStorage.removeItem('bm_admin_session');
           }
         }
-      } catch { localStorage.removeItem('bm_admin_session'); }
+      } catch { sessionStorage.removeItem('bm_admin_session'); }
 
       syncDoneRef.current = true;
       setIsServerSynced(true);
@@ -293,7 +293,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Helper: fully log out client and clear session
   const logoutClient = (showBanMessage = false) => {
-    localStorage.removeItem('smm_client_user_id');
+    sessionStorage.removeItem('smm_client_user_id');
     setClientLoggedIn(false);
     setCurrentClientUser(null);
     setPortalMode('landing');
@@ -892,7 +892,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers(prev => [...prev, newUser]);
     setCurrentClientUser(newUser);
     setClientLoggedIn(true);
-    localStorage.setItem('smm_client_user_id', newId);
+    sessionStorage.setItem('smm_client_user_id', newId);
     showToast(currentLanguage === 'TR' ? 'Hesabınız oluşturuldu! Bakiye yükleyerek sipariş verebilirsiniz.' : 'Account created! Add funds to start placing orders.', 'success');
     addNotification(`Yeni bayilik kaydı yapıldı: ${fullName} (${email})`, 'user');
     return true;

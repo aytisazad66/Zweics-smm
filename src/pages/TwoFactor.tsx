@@ -80,7 +80,11 @@ export const TwoFactor: React.FC = () => {
     }
   };
 
+  const hasSentRef = useRef(false);
+
   useEffect(() => {
+    if (hasSentRef.current) return;
+    hasSentRef.current = true;
     initCode();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

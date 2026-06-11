@@ -34,7 +34,8 @@ export const Landing: React.FC = () => {
     currentClientUser,
     users,
     showToast,
-    isServerSynced
+    isServerSynced,
+    smtpConfig
   } = useAppState();
 
   const [activePlatformFilter, setActivePlatformFilter] = useState<string>('Tümü');
@@ -51,6 +52,125 @@ export const Landing: React.FC = () => {
   const [authPassword, setAuthPassword] = useState('');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotOtpMode, setForgotOtpMode] = useState(false);
+  const [forgotOtpInput, setForgotOtpInput] = useState('');
+  const [forgotOtpError, setForgotOtpError] = useState(false);
+  const [forgotOtpLoading, setForgotOtpLoading] = useState(false);
+
+  const handleForgotSend = async () => {
+    if (!forgotEmail) return;
+    setForgotLoading(true);
+
+    // Check user exists
+    let foundUser: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
+    if (!foundUser) {
+      try {
+        const res = await fetch('/api/kv/smm_users');
+        if (res.ok) {
+          const d = await res.json();
+          if (d.value) foundUser = JSON.parse(d.value).find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
+        }
+      } catch {}
+    }
+
+    if (!foundUser) {
+      setForgotLoading(false);
+      showToast(currentLanguage === 'TR' ? 'Bu e-posta adresi kayıtlı değil.' : 'This email is not registered.', 'error');
+      return;
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiry = Date.now() + 10 * 60 * 1000; // 10 min
+    try {
+      await fetch('/api/kv/smm_otp_' + btoa(forgotEmail.toLowerCase()).replace(/=/g, ''), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify({ otp, expiry }) })
+      });
+    } catch {}
+
+    const smtpReady = !!(smtpConfig?.host && smtpConfig?.user && smtpConfig?.pass);
+    if (smtpReady) {
+      try {
+        await fetch('/api/mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: forgotEmail,
+            subject: 'Bor Media — Giriş Doğrulama Kodunuz',
+            body: `
+              <div style="font-family:sans-serif;background:#0F0F1A;color:#eeeeff;padding:32px;border-radius:16px;max-width:480px;margin:auto;">
+                <div style="text-align:center;margin-bottom:24px;">
+                  <div style="width:56px;height:56px;background:linear-gradient(135deg,#00D4FF,#7B2FFF);border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-weight:bold;font-size:18px;color:#fff;">BM</div>
+                </div>
+                <h2 style="text-align:center;color:#ffffff;margin-bottom:8px;">Şifremi Unuttum</h2>
+                <p style="text-align:center;color:#9999bb;font-size:13px;">Hesabınıza erişmek için tek kullanımlık kodunuz:</p>
+                <div style="text-align:center;margin:28px 0;">
+                  <span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#00D4FF;">${otp}</span>
+                </div>
+                <p style="text-align:center;color:#666688;font-size:11px;">Bu kod 10 dakika içinde geçerliliğini yitirir.<br>Siz talep etmediyseniz bu maili görmezden gelin.</p>
+                <hr style="border-color:#ffffff11;margin:24px 0;" />
+                <p style="text-align:center;color:#444466;font-size:10px;">Bor Media SMM Panel</p>
+              </div>
+            `,
+            smtp_host: smtpConfig.host,
+            smtp_port: smtpConfig.port,
+            smtp_user: smtpConfig.user,
+            smtp_pass: smtpConfig.pass,
+            from_name: smtpConfig.fromName || 'Bor Media'
+          })
+        });
+      } catch {}
+    }
+
+    setForgotLoading(false);
+    setForgotOtpMode(true);
+  };
+
+  const handleForgotVerifyOtp = async () => {
+    if (!forgotOtpInput || forgotOtpInput.length !== 6) return;
+    setForgotOtpLoading(true);
+    setForgotOtpError(false);
+    try {
+      const key = 'smm_otp_' + btoa(forgotEmail.toLowerCase()).replace(/=/g, '');
+      const res = await fetch('/api/kv/' + key);
+      if (res.ok) {
+        const d = await res.json();
+        if (d.value) {
+          const { otp, expiry } = JSON.parse(d.value);
+          if (Date.now() > expiry) {
+            setForgotOtpLoading(false);
+            showToast(currentLanguage === 'TR' ? 'Kodun süresi doldu. Tekrar deneyin.' : 'Code expired. Try again.', 'error');
+            setForgotOtpMode(false);
+            setForgotOtpInput('');
+            return;
+          }
+          if (forgotOtpInput === otp) {
+            // Delete OTP from KV
+            fetch('/api/kv/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: null }) }).catch(() => {});
+            // Find user and log them in
+            let u: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
+            if (!u) {
+              const r2 = await fetch('/api/kv/smm_users');
+              if (r2.ok) { const d2 = await r2.json(); if (d2.value) u = JSON.parse(d2.value).find((x: any) => x.email.toLowerCase() === forgotEmail.toLowerCase()); }
+            }
+            setForgotOtpLoading(false);
+            if (u) {
+              doLogin(u);
+            } else {
+              showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı.' : 'User not found.', 'error');
+            }
+            return;
+          }
+        }
+      }
+    } catch {}
+    setForgotOtpLoading(false);
+    setForgotOtpError(true);
+    showToast(currentLanguage === 'TR' ? 'Hatalı kod. Lütfen tekrar deneyin.' : 'Wrong code. Please try again.', 'error');
+  };
 
   const platforms = useMemo(() => {
     return ['Tümü', 'Instagram', 'TikTok', 'YouTube', 'Twitter', 'Spotify', 'Telegram'];
@@ -81,7 +201,7 @@ export const Landing: React.FC = () => {
       showToast(currentLanguage === 'TR' ? 'Hesabınız askıya alınmıştır.' : 'Your account has been suspended.', 'error');
       return;
     }
-    localStorage.setItem('smm_client_user_id', user.id);
+    sessionStorage.setItem('smm_client_user_id', user.id);
     setCurrentClientUser(user as any);
     setClientLoggedIn(true);
     setPortalMode('client');
@@ -132,7 +252,7 @@ export const Landing: React.FC = () => {
       const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
       if (isDemo || authPassword === 'password123') {
         const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
-        localStorage.setItem('smm_client_user_id', targetUser.id);
+        sessionStorage.setItem('smm_client_user_id', targetUser.id);
         setCurrentClientUser(targetUser as any);
         setClientLoggedIn(true);
         setPortalMode('client');
@@ -723,29 +843,10 @@ export const Landing: React.FC = () => {
 
             {authTab === 'forgot' ? (
               <div className="space-y-4 text-xs">
-                {forgotSent ? (
-                  <div className="text-center space-y-3 py-4">
-                    <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto">
-                      <CheckCircle className="w-6 h-6 text-emerald-400" />
-                    </div>
-                    <p className="text-sm font-bold text-white">
-                      {currentLanguage === 'TR' ? 'Şifre sıfırlama bağlantısı gönderildi!' : 'Password reset link sent!'}
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      {currentLanguage === 'TR' ? `${forgotEmail} adresine sıfırlama bağlantısı iletildi. Lütfen gelen kutunuzu kontrol edin.` : `A reset link was sent to ${forgotEmail}. Please check your inbox.`}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => { setAuthTab('login'); setForgotSent(false); setForgotEmail(''); }}
-                      className="text-cyan-400 font-bold hover:underline cursor-pointer"
-                    >
-                      {currentLanguage === 'TR' ? '← Giriş sayfasına dön' : '← Back to login'}
-                    </button>
-                  </div>
-                ) : (
+                {!forgotOtpMode ? (
                   <>
                     <p className="text-[11px] text-gray-400 leading-relaxed">
-                      {currentLanguage === 'TR' ? 'Kayıtlı e-posta adresinizi girin. Şifre sıfırlama bağlantısı göndereceğiz.' : 'Enter your registered email address. We will send you a password reset link.'}
+                      {currentLanguage === 'TR' ? 'Kayıtlı e-posta adresinizi girin. 6 haneli doğrulama kodunu e-postanıza göndereceğiz.' : 'Enter your registered email. We will send a 6-digit verification code.'}
                     </p>
                     <div className="space-y-1">
                       <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'E-Posta Adresiniz' : 'Email Address'}</label>
@@ -758,25 +859,70 @@ export const Landing: React.FC = () => {
                         onChange={(e) => setForgotEmail(e.target.value)}
                       />
                     </div>
+                    {!smtpConfig?.host && (
+                      <p className="text-[10px] text-amber-400 bg-amber-950/30 border border-amber-700/30 rounded-xl px-3 py-2">
+                        ⚠️ {currentLanguage === 'TR' ? 'SMTP ayarı yapılmamış. Kod e-posta yerine ekranda gösterilecek.' : 'SMTP not configured. Code will be shown on screen.'}
+                      </p>
+                    )}
                     <button
                       type="button"
-                      disabled={!forgotEmail}
-                      onClick={() => {
-                        if (!forgotEmail) return;
-                        setForgotSent(true);
-                        showToast(currentLanguage === 'TR' ? 'Şifre sıfırlama bağlantısı gönderildi!' : 'Password reset link sent!', 'success');
-                      }}
+                      disabled={!forgotEmail || forgotLoading}
+                      onClick={handleForgotSend}
                       className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      <span>{currentLanguage === 'TR' ? 'Sıfırlama Bağlantısı Gönder' : 'Send Reset Link'}</span>
-                      <ChevronRight className="w-4 h-4" />
+                      {forgotLoading ? (
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <>
+                          <span>{currentLanguage === 'TR' ? 'Doğrulama Kodu Gönder' : 'Send Verification Code'}</span>
+                          <ChevronRight className="w-4 h-4" />
+                        </>
+                      )}
                     </button>
+                    <button type="button" onClick={() => setAuthTab('login')} className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition">
+                      {currentLanguage === 'TR' ? '← Giriş sayfasına dön' : '← Back to login'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-center space-y-1 pb-1">
+                      <p className="text-[11px] text-gray-400">
+                        {currentLanguage === 'TR' ? `6 haneli kod ` : `6-digit code sent to `}
+                        <strong className="text-white">{forgotEmail}</strong>
+                        {currentLanguage === 'TR' ? ` adresine gönderildi.` : `.`}
+                      </p>
+                      {!smtpConfig?.host && (
+                        <p className="text-[10px] text-amber-400 bg-amber-950/30 border border-amber-700/30 rounded-xl px-3 py-2 mt-2">
+                          ⚠️ {currentLanguage === 'TR' ? 'SMTP ayarı olmadığı için kodu sunucu loglarından alabilirsiniz. (Geliştirme modu)' : 'No SMTP configured — check server logs for the code. (Dev mode)'}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? '6 Haneli Kod' : '6-Digit Code'}</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={6}
+                        className={`w-full bg-[#121226] border ${forgotOtpError ? 'border-red-500' : 'border-white/10'} rounded-xl py-3 px-4 text-white text-center text-lg font-mono tracking-[8px] placeholder-gray-600 focus:outline-none focus:border-cyan-400`}
+                        placeholder="— — — — — —"
+                        value={forgotOtpInput}
+                        onChange={(e) => { setForgotOtpInput(e.target.value.replace(/\D/g, '')); setForgotOtpError(false); }}
+                      />
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setAuthTab('login')}
-                      className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition"
+                      disabled={forgotOtpInput.length !== 6 || forgotOtpLoading}
+                      onClick={handleForgotVerifyOtp}
+                      className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      {currentLanguage === 'TR' ? '← Giriş sayfasına dön' : '← Back to login'}
+                      {forgotOtpLoading ? (
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <span>{currentLanguage === 'TR' ? 'Kodu Doğrula & Giriş Yap' : 'Verify Code & Login'}</span>
+                      )}
+                    </button>
+                    <button type="button" onClick={() => { setForgotOtpMode(false); setForgotOtpInput(''); setForgotOtpError(false); }} className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition">
+                      {currentLanguage === 'TR' ? '← E-postayı değiştir' : '← Change email'}
                     </button>
                   </>
                 )}
