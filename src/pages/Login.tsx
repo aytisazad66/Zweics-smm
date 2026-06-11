@@ -134,7 +134,7 @@ export const Login: React.FC = () => {
                 type="email"
                 required
                 className="w-full bg-[#121226]/60 border border-white/10 rounded-xl py-3.5 pl-11 pr-4 text-white text-sm placeholder-gray-600 focus:outline-none focus:border-cyan-400 focus:bg-[#121226]"
-                placeholder="admin@bormedia.com"
+                placeholder="admin@bormedya.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />

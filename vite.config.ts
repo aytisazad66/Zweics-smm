@@ -56,7 +56,7 @@ function smmProxyPlugin(): Plugin {
   };
 }
 
-const DEFAULT_ADMIN_EMAIL = 'admin@bormedia.com';
+const DEFAULT_ADMIN_EMAIL = 'admin@bormedya.com';
 const DEFAULT_ADMIN_PASS  = 'Admin123!';
 
 function kvStorePlugin(): Plugin {

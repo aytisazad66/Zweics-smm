@@ -340,7 +340,7 @@ export const Settings: React.FC = () => {
 
             <div className="p-3 bg-rose-950/10 border border-rose-800/20 rounded-xl text-[10px] text-rose-300 flex items-start gap-2">
               <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <span>Varsayılan: <code className="text-rose-200">admin@bormedia.com</code> / <code className="text-rose-200">Admin123!</code> — Canlıya geçmeden önce mutlaka değiştirin!</span>
+              <span>Varsayılan: <code className="text-rose-200">admin@bormedya.com</code> / <code className="text-rose-200">Admin123!</code> — Canlıya geçmeden önce mutlaka değiştirin!</span>
             </div>
 
             <div className="space-y-3 text-xs">
