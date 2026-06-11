@@ -47,6 +47,7 @@ export interface User {
   status: 'active' | 'suspended';
   note?: string;
   notifications?: UserNotification[];
+  password?: string;
 }
 
 export interface PaymentMethod {

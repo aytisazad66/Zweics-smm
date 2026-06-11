@@ -33,6 +33,7 @@ export const Landing: React.FC = () => {
     clientLoggedIn,
     currentClientUser,
     users,
+    setUsers,
     showToast,
     isServerSynced,
     smtpConfig
@@ -59,6 +60,11 @@ export const Landing: React.FC = () => {
   const [forgotOtpLoading, setForgotOtpLoading] = useState(false);
   const [forgotMailError, setForgotMailError] = useState('');
   const [forgotFallbackCode, setForgotFallbackCode] = useState('');
+  const [forgotNewPassStep, setForgotNewPassStep] = useState(false);
+  const [forgotNewPass, setForgotNewPass] = useState('');
+  const [forgotNewPass2, setForgotNewPass2] = useState('');
+  const [forgotNewPassLoading, setForgotNewPassLoading] = useState(false);
+  const [forgotVerifiedUser, setForgotVerifiedUser] = useState<any>(null);
 
   const otpKey = (email: string) => 'smm_otp_' + email.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
@@ -174,7 +180,7 @@ export const Landing: React.FC = () => {
           if (forgotOtpInput === otp) {
             // Delete OTP from KV
             fetch('/api/kv/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: null }) }).catch(() => {});
-            // Find user and log them in
+            // Find user
             let u: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
             if (!u) {
               const r2 = await fetch('/api/kv/smm_users');
@@ -182,7 +188,8 @@ export const Landing: React.FC = () => {
             }
             setForgotOtpLoading(false);
             if (u) {
-              doLogin(u);
+              setForgotVerifiedUser(u);
+              setForgotNewPassStep(true);
             } else {
               showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı.' : 'User not found.', 'error');
             }
@@ -194,6 +201,47 @@ export const Landing: React.FC = () => {
     setForgotOtpLoading(false);
     setForgotOtpError(true);
     showToast(currentLanguage === 'TR' ? 'Hatalı kod. Lütfen tekrar deneyin.' : 'Wrong code. Please try again.', 'error');
+  };
+
+  const handleForgotSetPassword = async () => {
+    if (!forgotNewPass || forgotNewPass.length < 6) {
+      showToast(currentLanguage === 'TR' ? 'Şifre en az 6 karakter olmalı.' : 'Password must be at least 6 characters.', 'error');
+      return;
+    }
+    if (forgotNewPass !== forgotNewPass2) {
+      showToast(currentLanguage === 'TR' ? 'Şifreler eşleşmiyor.' : 'Passwords do not match.', 'error');
+      return;
+    }
+    setForgotNewPassLoading(true);
+    const updatedUser = { ...forgotVerifiedUser, password: forgotNewPass };
+    // Update in users state and KV
+    setUsers((prev: any[]) => prev.map((u: any) => u.id === updatedUser.id ? updatedUser : u));
+    try {
+      const res = await fetch('/api/kv/smm_users');
+      if (res.ok) {
+        const d = await res.json();
+        if (d.value) {
+          const all = JSON.parse(d.value).map((u: any) => u.id === updatedUser.id ? updatedUser : u);
+          await fetch('/api/kv/smm_users', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ value: JSON.stringify(all) })
+          });
+        }
+      }
+    } catch {}
+    setForgotNewPassLoading(false);
+    showToast(currentLanguage === 'TR' ? 'Şifreniz başarıyla güncellendi!' : 'Password updated successfully!', 'success');
+    // Reset forgot state and log in
+    setForgotNewPassStep(false);
+    setForgotOtpMode(false);
+    setForgotOtpInput('');
+    setForgotNewPass('');
+    setForgotNewPass2('');
+    setForgotEmail('');
+    setForgotFallbackCode('');
+    setForgotMailError('');
+    doLogin(updatedUser);
   };
 
   const platforms = useMemo(() => {
@@ -255,7 +303,14 @@ export const Landing: React.FC = () => {
 
       // 1. Check local state first (instant)
       const localUser = users.find(u => u.email.toLowerCase() === email);
-      if (localUser) { doLogin(localUser); return; }
+      if (localUser) {
+        if (localUser.password && localUser.password !== authPassword) {
+          showToast(currentLanguage === 'TR' ? 'Şifre hatalı.' : 'Wrong password.', 'error');
+          return;
+        }
+        doLogin(localUser);
+        return;
+      }
 
       // 2. Fallback: fetch directly from server (handles race condition on new devices)
       setAuthLoading(true);
@@ -266,7 +321,16 @@ export const Landing: React.FC = () => {
           if (data.value) {
             const serverUsers: any[] = JSON.parse(data.value);
             const serverUser = serverUsers.find((u: any) => u.email.toLowerCase() === email);
-            if (serverUser) { doLogin(serverUser); setAuthLoading(false); return; }
+            if (serverUser) {
+              if (serverUser.password && serverUser.password !== authPassword) {
+                setAuthLoading(false);
+                showToast(currentLanguage === 'TR' ? 'Şifre hatalı.' : 'Wrong password.', 'error');
+                return;
+              }
+              doLogin(serverUser);
+              setAuthLoading(false);
+              return;
+            }
           }
         }
       } catch { /* server unavailable */ }
@@ -867,7 +931,52 @@ export const Landing: React.FC = () => {
 
             {authTab === 'forgot' ? (
               <div className="space-y-4 text-xs">
-                {!forgotOtpMode ? (
+                {forgotNewPassStep ? (
+                  <>
+                    <div className="text-center space-y-1 pb-1">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto mb-2">
+                        <svg className="w-5 h-5 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      </div>
+                      <p className="text-white font-bold text-sm">{currentLanguage === 'TR' ? 'Kimlik Doğrulandı ✓' : 'Identity Verified ✓'}</p>
+                      <p className="text-[11px] text-gray-400">{currentLanguage === 'TR' ? 'Yeni şifrenizi belirleyin.' : 'Set your new password.'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Yeni Şifre' : 'New Password'}</label>
+                      <input
+                        type="password"
+                        className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
+                        placeholder={currentLanguage === 'TR' ? 'En az 6 karakter' : 'At least 6 characters'}
+                        value={forgotNewPass}
+                        onChange={(e) => setForgotNewPass(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Yeni Şifre (Tekrar)' : 'Confirm New Password'}</label>
+                      <input
+                        type="password"
+                        className={`w-full bg-[#121226] border ${forgotNewPass2 && forgotNewPass !== forgotNewPass2 ? 'border-red-500' : 'border-white/10'} rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400`}
+                        placeholder={currentLanguage === 'TR' ? 'Şifreyi tekrar girin' : 'Repeat password'}
+                        value={forgotNewPass2}
+                        onChange={(e) => setForgotNewPass2(e.target.value)}
+                      />
+                      {forgotNewPass2 && forgotNewPass !== forgotNewPass2 && (
+                        <p className="text-[10px] text-red-400">{currentLanguage === 'TR' ? 'Şifreler eşleşmiyor.' : 'Passwords do not match.'}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!forgotNewPass || forgotNewPass.length < 6 || forgotNewPass !== forgotNewPass2 || forgotNewPassLoading}
+                      onClick={handleForgotSetPassword}
+                      className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {forgotNewPassLoading ? (
+                        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <span>{currentLanguage === 'TR' ? 'Şifreyi Kaydet & Giriş Yap' : 'Save Password & Login'}</span>
+                      )}
+                    </button>
+                  </>
+                ) : !forgotOtpMode ? (
                   <>
                     <p className="text-[11px] text-gray-400 leading-relaxed">
                       {currentLanguage === 'TR' ? 'Kayıtlı e-posta adresinizi girin. 6 haneli doğrulama kodunu e-postanıza göndereceğiz.' : 'Enter your registered email. We will send a 6-digit verification code.'}
