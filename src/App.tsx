@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { AppProvider, useAppState } from './context/AppContext';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -24,13 +24,107 @@ const AppContent: React.FC = () => {
   const { 
     isLoggedIn, 
     is2FAVerified, 
-    currentTab, 
+    currentTab,
+    setCurrentTab,
     toastMsg,
     portalMode,
     setPortalMode,
     clientLoggedIn,
-    currentLanguage
+    currentLanguage,
+    isServerSynced
   } = useAppState();
+
+  // ── Browser history sync ──────────────────────────────────────────────────
+  // The app uses React state navigation (no URL changes), so the browser's
+  // back button has nothing to go back to inside the app. We fix this by
+  // pushing a history entry on every navigation change and restoring state
+  // on popstate (back/forward button press).
+
+  const historyReady = useRef(false);
+  const suppressNextPush = useRef(false);
+
+  // Sync state → browser history
+  useEffect(() => {
+    if (!historyReady.current) {
+      // First run: replace the initial browser entry so we always have state
+      historyReady.current = true;
+      window.history.replaceState({ portalMode, currentTab }, '');
+      return;
+    }
+    if (suppressNextPush.current) {
+      suppressNextPush.current = false;
+      return;
+    }
+    window.history.pushState({ portalMode, currentTab }, '');
+  }, [portalMode, currentTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Browser history → state (back / forward buttons)
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      const s = e.state as { portalMode?: string; currentTab?: string } | null;
+      if (!s?.portalMode) return;
+      suppressNextPush.current = true;
+      setPortalMode(s.portalMode as 'landing' | 'client' | 'admin');
+      if (s.currentTab) setCurrentTab(s.currentTab);
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [setPortalMode, setCurrentTab]);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── Gizli Admin Erişimi ───────────────────────────────────────────────────
+  // YOL 1 — URL hash: tarayıcıya "#bm-yonetici" yazılınca admin login açılır.
+  // YOL 2 — Gizli klavye dizisi: herhangi bir sayfada "boradmin" yazılınca
+  //          aynı etkiyi yapar (mobil için hash yeterli).
+  // Yönetici butonları müşteri panelinden tamamen kaldırıldı.
+  const SECRET_HASH     = 'bm-yonetici';
+  const SECRET_SEQUENCE = 'boradmin';
+  const keyBuffer       = useRef('');
+
+  // URL hash kontrolü — sayfa açılışında ve hash değiştiğinde
+  useEffect(() => {
+    const checkHash = () => {
+      if (window.location.hash === `#${SECRET_HASH}`) {
+        // Hash'i temizle (URL'de görünmesin)
+        window.history.replaceState(null, '', window.location.pathname);
+        setPortalMode('admin');
+      }
+    };
+    checkHash();
+    window.addEventListener('hashchange', checkHash);
+    return () => window.removeEventListener('hashchange', checkHash);
+  }, [setPortalMode]);
+
+  // Klavye dizisi dinleyicisi
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Input/textarea içindeyken tetiklemesin
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      keyBuffer.current = (keyBuffer.current + e.key).slice(-SECRET_SEQUENCE.length);
+      if (keyBuffer.current === SECRET_SEQUENCE) {
+        keyBuffer.current = '';
+        setPortalMode('admin');
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [setPortalMode]);
+  // ─────────────────────────────────────────────────────────────────────────
+
+  if (!isServerSynced) {
+    return (
+      <div className="min-h-screen bg-[#0F0F1A] flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white text-lg shadow-xl shadow-cyan-400/20 animate-pulse">
+          SMM
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin" />
+          <span className="text-xs text-gray-500 font-medium">Sistem yükleniyor...</span>
+        </div>
+      </div>
+    );
+  }
 
   // Active page router matrix for admin area
   const renderActiveAdminPage = () => {

@@ -23,8 +23,8 @@ export const LiveSupport: React.FC = () => {
           id: 'w1',
           sender: 'system',
           text: currentLanguage === 'TR' 
-            ? 'Hoş geldiniz! Ben SMM Pro Yapay Zeka Danışmanınız. Paneliniz, servisleriniz veya API entegrasyonlarınızla ilgili bana her şeyi sorabilirsiniz.'
-            : 'Welcome! I am your SMM Pro AI Assistant. Feel free to ask me anything about your panels, services, or API integrations.',
+            ? 'Hoş geldiniz! Ben Bor Media Yapay Zeka Danışmanınız. Paneliniz, servisleriniz veya API entegrasyonlarınızla ilgili bana her şeyi sorabilirsiniz.'
+            : 'Welcome! I am your Bor Media AI Assistant. Feel free to ask me anything about your panels, services, or API integrations.',
           time: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
         }
       ]);

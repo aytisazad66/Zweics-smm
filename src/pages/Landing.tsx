@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useAppState } from '../context/AppContext';
 import { 
   Zap, 
@@ -45,10 +45,12 @@ export const Landing: React.FC = () => {
 
   // Authentication states (Modal)
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [authTab, setAuthTab] = useState<'login' | 'register' | 'forgot'>('login');
   const [authEmail, setAuthEmail] = useState('');
   const [authFullName, setAuthFullName] = useState('');
   const [authPassword, setAuthPassword] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSent, setForgotSent] = useState(false);
 
   const platforms = useMemo(() => {
     return ['Tümü', 'Instagram', 'TikTok', 'YouTube', 'Twitter', 'Spotify', 'Telegram'];
@@ -79,6 +81,7 @@ export const Landing: React.FC = () => {
       showToast(currentLanguage === 'TR' ? 'Hesabınız askıya alınmıştır.' : 'Your account has been suspended.', 'error');
       return;
     }
+    localStorage.setItem('smm_client_user_id', user.id);
     setCurrentClientUser(user as any);
     setClientLoggedIn(true);
     setPortalMode('client');
@@ -129,6 +132,7 @@ export const Landing: React.FC = () => {
       const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
       if (isDemo || authPassword === 'password123') {
         const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
+        localStorage.setItem('smm_client_user_id', targetUser.id);
         setCurrentClientUser(targetUser as any);
         setClientLoggedIn(true);
         setPortalMode('client');
@@ -148,7 +152,7 @@ export const Landing: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#090915] text-[#eeeeff] font-sans antialiased relative overflow-x-hidden">
+    <div className="min-h-screen bg-[#090915] text-[#eeeeff] font-sans antialiased relative overflow-hidden">
 
       {/* Dynamic Grid Background Overlay */}
       <div className="absolute inset-0 bg-[linear-gradient(to_right,#14142b_1px,transparent_1px),linear-gradient(to_bottom,#14142b_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)] opacity-35 pointer-events-none" />
@@ -165,14 +169,14 @@ export const Landing: React.FC = () => {
           {/* Logo brand */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/15">
-              SMM
+              BM
             </div>
             <div>
               <span className="font-bold text-lg font-sora text-white tracking-wide block leading-none">
-                SMM PRO
+                Bor Media
               </span>
               <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mt-0.5 block">
-                GROUP TURKEY
+                SMM PANEL
               </span>
             </div>
           </div>
@@ -344,8 +348,7 @@ export const Landing: React.FC = () => {
 
           <button
             onClick={() => {
-              setAuthTab('login');
-              setAuthModalOpen(true);
+              document.getElementById('services-sec')?.scrollIntoView({ behavior: 'smooth' });
             }}
             className="w-full sm:w-auto px-8 py-4 bg-[#14142d] hover:bg-[#1a1a3c] border border-white/10 text-white font-bold rounded-2xl flex items-center justify-center gap-2 transition cursor-pointer"
           >
@@ -573,7 +576,10 @@ export const Landing: React.FC = () => {
                 <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
               </div>
-              <span className="font-mono text-gray-500">api-endpoint-v2.json</span>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-gray-500">api-endpoint-v2.json</span>
+                <span className="px-2 py-0.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[9px] font-bold rounded-full uppercase tracking-wider">Yakında...</span>
+              </div>
             </div>
 
             <pre className="font-mono text-[10.5px] leading-relaxed text-indigo-300 overflow-x-auto select-all">
@@ -613,16 +619,19 @@ export const Landing: React.FC = () => {
             </p>
           </div>
           <div>
-            <button
-              onClick={() => {
-                setAuthTab('register');
-                setAuthModalOpen(true);
-              }}
-              className="px-6 py-3.5 bg-[#121226] hover:bg-[#1a1a36] border border-cyan-400/30 text-cyan-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
-            >
-              <span>{currentLanguage === 'TR' ? 'Hemen API KEY Al' : 'Generate API KEY'}</span>
-              <ChevronRight className="w-4 h-4" />
-            </button>
+            <div className="flex flex-col items-center gap-2">
+              <button
+                onClick={() => {
+                  setAuthTab('register');
+                  setAuthModalOpen(true);
+                }}
+                className="px-6 py-3.5 bg-[#121226] hover:bg-[#1a1a36] border border-cyan-400/30 text-cyan-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
+              >
+                <span>{currentLanguage === 'TR' ? 'Hemen API KEY Al' : 'Generate API KEY'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+              <span className="text-[10px] text-yellow-400 font-bold">(Yakında...)</span>
+            </div>
           </div>
         </div>
       </section>
@@ -650,11 +659,11 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-white/5 bg-[#05050f]/90 py-10 text-xs text-gray-500 relative z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+      <footer className="border-t border-white/5 bg-[#05050f]/90 py-8 text-xs text-gray-500 relative z-30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white text-xs">
-              S
+              BM
             </div>
             <span className="font-bold text-gray-300">Bor Media Group © 2026. Tüm hakları saklıdır.</span>
           </div>
@@ -679,92 +688,169 @@ export const Landing: React.FC = () => {
               <h3 className="text-lg font-bold font-sora text-white">
                 {authTab === 'login' ? (
                   currentLanguage === 'TR' ? 'Müşteri Girişi' : 'Client Access'
+                ) : authTab === 'forgot' ? (
+                  currentLanguage === 'TR' ? 'Şifremi Unuttum' : 'Forgot Password'
                 ) : (
                   currentLanguage === 'TR' ? 'Hemen Hesap Oluştur' : 'Register New Dealer'
                 )}
               </h3>
               <p className="text-[11px] text-gray-500 mt-1">
                 {currentLanguage === 'TR' 
-                  ? 'SMM Pro Group Turkey ayrıcalıklı bayiler platformu.' 
-                  : 'SMM Pro Group Turkey premium reselling program.'}
+                  ? 'Bor Media ayrıcalıklı bayiler platformu.' 
+                  : 'Bor Media premium reselling program.'}
               </p>
             </div>
 
 
-            <div className="grid grid-cols-2 bg-[#121226] p-1 rounded-2xl mb-4 text-xs font-bold font-sora">
-              <button
-                type="button"
-                onClick={() => setAuthTab('login')}
-                className={`py-2 rounded-xl text-center cursor-pointer transition ${authTab === 'login' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
-                {currentLanguage === 'TR' ? 'Giriş Yap' : 'Login'}
-              </button>
-              <button
-                type="button"
-                onClick={() => setAuthTab('register')}
-                className={`py-2 rounded-xl text-center cursor-pointer transition ${authTab === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
-              >
-                {currentLanguage === 'TR' ? 'Kayıt Ol (Ücretsiz)' : 'Sign Up'}
-              </button>
-            </div>
-
-            <form onSubmit={handleAuthSubmit} className="space-y-4 text-xs">
-              {authTab === 'register' && (
-                <div className="space-y-1">
-                  <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Adınız Soyadınız' : 'Full Name'}</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                    placeholder="örn: Salih Music"
-                    value={authFullName}
-                    onChange={(e) => setAuthFullName(e.target.value)}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'E-Posta Adresiniz' : 'Email Address'}</label>
-                <input
-                  type="email"
-                  required
-                  className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                  placeholder="örn: salihmusicinc@gmail.com"
-                  value={authEmail}
-                  onChange={(e) => setAuthEmail(e.target.value)}
-                />
+            {authTab !== 'forgot' && (
+              <div className="grid grid-cols-2 bg-[#121226] p-1 rounded-2xl mb-4 text-xs font-bold font-sora">
+                <button
+                  type="button"
+                  onClick={() => setAuthTab('login')}
+                  className={`py-2 rounded-xl text-center cursor-pointer transition ${authTab === 'login' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {currentLanguage === 'TR' ? 'Giriş Yap' : 'Login'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthTab('register')}
+                  className={`py-2 rounded-xl text-center cursor-pointer transition ${authTab === 'register' ? 'bg-cyan-500 text-white' : 'text-gray-400 hover:text-white'}`}
+                >
+                  {currentLanguage === 'TR' ? 'Kayıt Ol (Ücretsiz)' : 'Sign Up'}
+                </button>
               </div>
+            )}
 
-              <div className="space-y-1">
-                <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Şifre' : 'Password'}</label>
-                <input
-                  type="password"
-                  required
-                  className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400"
-                  placeholder="••••••••"
-                  value={authPassword}
-                  onChange={(e) => setAuthPassword(e.target.value)}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={authLoading}
-                className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
-              >
-                {authLoading ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    <span>{currentLanguage === 'TR' ? 'Hesap aranıyor...' : 'Looking up account...'}</span>
-                  </>
+            {authTab === 'forgot' ? (
+              <div className="space-y-4 text-xs">
+                {forgotSent ? (
+                  <div className="text-center space-y-3 py-4">
+                    <div className="w-12 h-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto">
+                      <CheckCircle className="w-6 h-6 text-emerald-400" />
+                    </div>
+                    <p className="text-sm font-bold text-white">
+                      {currentLanguage === 'TR' ? 'Şifre sıfırlama bağlantısı gönderildi!' : 'Password reset link sent!'}
+                    </p>
+                    <p className="text-[11px] text-gray-500">
+                      {currentLanguage === 'TR' ? `${forgotEmail} adresine sıfırlama bağlantısı iletildi. Lütfen gelen kutunuzu kontrol edin.` : `A reset link was sent to ${forgotEmail}. Please check your inbox.`}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setAuthTab('login'); setForgotSent(false); setForgotEmail(''); }}
+                      className="text-cyan-400 font-bold hover:underline cursor-pointer"
+                    >
+                      {currentLanguage === 'TR' ? '← Giriş sayfasına dön' : '← Back to login'}
+                    </button>
+                  </div>
                 ) : (
                   <>
-                    <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur' : 'Create Account')}</span>
-                    <ChevronRight className="w-4 h-4" />
+                    <p className="text-[11px] text-gray-400 leading-relaxed">
+                      {currentLanguage === 'TR' ? 'Kayıtlı e-posta adresinizi girin. Şifre sıfırlama bağlantısı göndereceğiz.' : 'Enter your registered email address. We will send you a password reset link.'}
+                    </p>
+                    <div className="space-y-1">
+                      <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'E-Posta Adresiniz' : 'Email Address'}</label>
+                      <input
+                        type="email"
+                        required
+                        className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
+                        placeholder="örn: email@ornek.com"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      disabled={!forgotEmail}
+                      onClick={() => {
+                        if (!forgotEmail) return;
+                        setForgotSent(true);
+                        showToast(currentLanguage === 'TR' ? 'Şifre sıfırlama bağlantısı gönderildi!' : 'Password reset link sent!', 'success');
+                      }}
+                      className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span>{currentLanguage === 'TR' ? 'Sıfırlama Bağlantısı Gönder' : 'Send Reset Link'}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAuthTab('login')}
+                      className="w-full text-center text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition"
+                    >
+                      {currentLanguage === 'TR' ? '← Giriş sayfasına dön' : '← Back to login'}
+                    </button>
                   </>
                 )}
-              </button>
-            </form>
+              </div>
+            ) : (
+              <form onSubmit={handleAuthSubmit} className="space-y-4 text-xs">
+                {authTab === 'register' && (
+                  <div className="space-y-1">
+                    <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Adınız Soyadınız' : 'Full Name'}</label>
+                    <input
+                      type="text"
+                      required
+                      className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
+                      placeholder="örn: Salih Music"
+                      value={authFullName}
+                      onChange={(e) => setAuthFullName(e.target.value)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'E-Posta Adresiniz' : 'Email Address'}</label>
+                  <input
+                    type="email"
+                    required
+                    className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
+                    placeholder="örn: salihmusicinc@gmail.com"
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Şifre' : 'Password'}</label>
+                    {authTab === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => { setAuthTab('forgot'); setForgotEmail(authEmail); setForgotSent(false); }}
+                        className="text-[10px] font-bold text-cyan-400 hover:underline cursor-pointer"
+                      >
+                        {currentLanguage === 'TR' ? 'Şifremi Unuttum' : 'Forgot Password?'}
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="password"
+                    required
+                    className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400"
+                    placeholder="••••••••"
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={authLoading}
+                  className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
+                >
+                  {authLoading ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      <span>{currentLanguage === 'TR' ? 'Hesap aranıyor...' : 'Looking up account...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{authTab === 'login' ? (currentLanguage === 'TR' ? 'Hesaba Giriş Yap' : 'Authorize Session') : (currentLanguage === 'TR' ? 'Hesabımı Oluştur' : 'Create Account')}</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

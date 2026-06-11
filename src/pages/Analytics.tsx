@@ -2,33 +2,63 @@ import React, { useState, useMemo } from 'react';
 import { useAppState } from '../context/AppContext';
 import { BarChart, Wallet, Calendar, Download, TrendingUp, Compass, Award, Activity } from 'lucide-react';
 
+// Parse both ISO ("2026-06-01T...") and legacy Turkish locale ("01.06.2026 14:30") formats
+const parseFlexDate = (d: string): Date => {
+  const iso = new Date(d);
+  if (!isNaN(iso.getTime())) return iso;
+  const m = d.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+  if (m) return new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0));
+  return new Date(NaN);
+};
+
 export const Analytics: React.FC = () => {
-  const { currentLanguage, showToast, orders } = useAppState();
+  const { currentLanguage, showToast, orders, users } = useAppState();
   const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('30d');
 
-  // Compute income data from real orders
+  const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
+
+  // Compute income data from real orders (robust date parsing)
   const thirtyDaysIncomeData = useMemo(() => {
-    const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
-    const map: Record<string, { income: number; users: Set<string> }> = {};
+    const map: Record<string, { income: number }> = {};
     const cutoff = dateRange === '7d' ? Date.now() - 7 * 86400000
       : dateRange === '30d' ? Date.now() - 30 * 86400000 : 0;
     orders.forEach(o => {
-      const d = new Date(o.date);
-      if (d.getTime() < cutoff) return;
+      const d = parseFlexDate(o.date);
+      if (isNaN(d.getTime()) || d.getTime() < cutoff) return;
       const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
-      if (!map[label]) map[label] = { income: 0, users: new Set() };
+      if (!map[label]) map[label] = { income: 0 };
       map[label].income += o.charge;
-      map[label].users.add(o.userId);
     });
     const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
     const result = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.now() - i * 86400000);
       const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
-      result.push({ date: label, income: map[label]?.income || 0, users: map[label]?.users.size || 0 });
+      result.push({ date: label, income: map[label]?.income || 0 });
     }
     return result;
   }, [orders, dateRange]);
+
+  // Real user registration data from users.joinedDate
+  const registrationData = useMemo(() => {
+    const map: Record<string, number> = {};
+    const cutoff = dateRange === '7d' ? Date.now() - 7 * 86400000
+      : dateRange === '30d' ? Date.now() - 30 * 86400000 : 0;
+    users.forEach(u => {
+      const d = parseFlexDate(u.joinedDate);
+      if (isNaN(d.getTime()) || d.getTime() < cutoff) return;
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      map[label] = (map[label] || 0) + 1;
+    });
+    const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 90;
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(Date.now() - i * 86400000);
+      const label = `${d.getDate().toString().padStart(2,'0')} ${MONTHS[d.getMonth()]}`;
+      result.push({ date: label, registrations: map[label] || 0 });
+    }
+    return result;
+  }, [users, dateRange]);
 
   // Platform profitability from real orders
   const platformProfitStats = useMemo(() => {
@@ -36,8 +66,8 @@ export const Analytics: React.FC = () => {
       : dateRange === '30d' ? Date.now() - 30 * 86400000 : 0;
     const stats: Record<string, { revenue: number; count: number }> = {};
     orders.forEach(o => {
-      const d = new Date(o.date);
-      if (d.getTime() < cutoff) return;
+      const d = parseFlexDate(o.date);
+      if (isNaN(d.getTime()) || d.getTime() < cutoff) return;
       if (!stats[o.platform]) stats[o.platform] = { revenue: 0, count: 0 };
       stats[o.platform].revenue += o.charge;
       stats[o.platform].count++;
@@ -56,9 +86,9 @@ export const Analytics: React.FC = () => {
   // Simulated export to CSV
   const handleExportCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += "Tarih,Gelir (TL),Yeni Kullanıcı\n";
-    thirtyDaysIncomeData.forEach(row => {
-      csvContent += `${row.date},${row.income},${row.users}\n`;
+    csvContent += "Tarih,Gelir (TL),Yeni Kayıt\n";
+    thirtyDaysIncomeData.forEach((row, i) => {
+      csvContent += `${row.date},${row.income},${registrationData[i]?.registrations ?? 0}\n`;
     });
     
     const encodedUri = encodeURI(csvContent);
@@ -83,18 +113,19 @@ export const Analytics: React.FC = () => {
   const items = thirtyDaysIncomeData.slice(-8); // compare last 8 records
   const maxVal = Math.max(...items.map(d => d.income));
 
-  // Area Chart Calculations (Kullanıcı büyümesi Area)
+  // Area Chart Calculations — real user registrations by day
   const areaHeight = 150;
   const areaWidth = 600;
-  const maxUsersVal = Math.max(...thirtyDaysIncomeData.map(d => d.users));
-  const userPoints = thirtyDaysIncomeData.map((d, idx) => {
-    const x = (idx / (thirtyDaysIncomeData.length - 1)) * areaWidth;
-    const y = areaHeight - (d.users / maxUsersVal) * (areaHeight - 20);
-    return { x, y };
+  const maxUsersVal = Math.max(...registrationData.map(d => d.registrations), 1);
+  const userPoints = registrationData.map((d, idx) => {
+    const x = registrationData.length > 1 ? (idx / (registrationData.length - 1)) * areaWidth : areaWidth / 2;
+    const y = areaHeight - (d.registrations / maxUsersVal) * (areaHeight - 20);
+    return { x, y: parseFloat(y.toFixed(1)) };
   });
 
   const userPath = userPoints.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
   const userArea = `${userPath} L ${areaWidth} ${areaHeight} L 0 ${areaHeight} Z`;
+  const totalNewUsers = registrationData.reduce((s, d) => s + d.registrations, 0);
 
   return (
     <div className="space-y-6 animate-fade-in text-[#eeeeff]">
@@ -235,8 +266,8 @@ export const Analytics: React.FC = () => {
         {/* SVG custom Area Chart: Client Growth */}
         <div className="glass-panel p-5 rounded-3xl flex flex-col justify-between">
           <div className="mb-4">
-            <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Müşteri Büyüme Hacim Eğrisi (Area)</h4>
-            <span className="text-sm font-bold text-white">Son 30 Gün Üye Edinme</span>
+            <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-1">Gerçek Kayıt Eğrisi (Area)</h4>
+            <span className="text-sm font-bold text-white">Yeni Üye Kayıtları — {totalNewUsers} kişi</span>
           </div>
 
           <div className="relative pt-2">

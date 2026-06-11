@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppState } from '../context/AppContext';
 import { 
   Zap, 
@@ -40,7 +40,8 @@ import {
   Home,
   Copy,
   ClipboardCheck,
-  BanknoteIcon
+  BanknoteIcon,
+  Bell
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -58,13 +59,66 @@ export const ClientDashboard: React.FC = () => {
     placeClientOrder,
     submitClientPaymentRequest,
     submitClientTicket,
+    markUserNotificationsRead,
     currentLanguage,
     setCurrentLanguage,
-    showToast
+    showToast,
+    announcementText
   } = useAppState();
 
   // Unified Tab Management
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'new-order' | 'services' | 'my-orders' | 'add-funds' | 'tickets' | 'api-docs'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'new-order' | 'services' | 'my-orders' | 'add-funds' | 'tickets' | 'api-docs' | 'notifications'>('dashboard');
+
+  // Announcement popup — only shown once per unique message (persisted in localStorage)
+  const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
+  useEffect(() => {
+    if (!announcementText) return;
+    const seenKey = 'bm_seen_announcement';
+    const alreadySeen = localStorage.getItem(seenKey) === announcementText;
+    if (!alreadySeen) {
+      setShowAnnouncementPopup(true);
+    }
+  }, [announcementText]);
+  const dismissAnnouncement = () => {
+    localStorage.setItem('bm_seen_announcement', announcementText);
+    setShowAnnouncementPopup(false);
+  };
+
+  // ── Client portal tab history sync ───────────────────────────────────────
+  // Keeps the browser back/forward buttons working within the client portal.
+  // On first render we update (replace) the existing history entry with the
+  // client tab so App.tsx's entry also carries tab info.  On every subsequent
+  // tab change we push a new entry.  On popstate we restore the tab.
+  const clientTabReady = useRef(false);
+  const suppressClientPush = useRef(false);
+
+  useEffect(() => {
+    if (!clientTabReady.current) {
+      clientTabReady.current = true;
+      // Enrich the history entry App.tsx just pushed with our tab info
+      const cur = window.history.state ?? {};
+      window.history.replaceState({ ...cur, clientActiveTab: activeTab }, '');
+      return;
+    }
+    if (suppressClientPush.current) {
+      suppressClientPush.current = false;
+      return;
+    }
+    window.history.pushState({ portalMode: 'client', clientActiveTab: activeTab }, '');
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const onPopState = (e: PopStateEvent) => {
+      const s = e.state as { clientActiveTab?: string } | null;
+      if (s?.clientActiveTab) {
+        suppressClientPush.current = true;
+        setActiveTab(s.clientActiveTab as typeof activeTab);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+  // ─────────────────────────────────────────────────────────────────────────
 
   // Mobile navigation drawer state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -132,6 +186,12 @@ export const ClientDashboard: React.FC = () => {
     return parseFloat(((activeServiceObj.pricePer1000 * orderQuantity) / 1000).toFixed(2));
   }, [activeServiceObj, orderQuantity]);
 
+  // Client notification unread count
+  const unreadNotifCount = useMemo(() => {
+    if (!currentClientUser) return 0;
+    return (currentClientUser.notifications ?? []).filter(n => !n.read).length;
+  }, [currentClientUser]);
+
   // Client specifics
   const clientOrders = useMemo(() => {
     if (!currentClientUser) return [];
@@ -195,20 +255,27 @@ export const ClientDashboard: React.FC = () => {
 
   // Monthly trend data from real orders (last 4 weeks)
   const monthlyTrendData = useMemo(() => {
+    // Handles both ISO ("2026-06-01T...") and legacy Turkish format ("01.06.2026 14:30")
+    const parseD = (s: string): Date => {
+      const iso = new Date(s);
+      if (!isNaN(iso.getTime())) return iso;
+      const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}))?/);
+      return m ? new Date(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)) : new Date(NaN);
+    };
     const now = new Date();
     const MONTHS = ['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];
     const points = [];
     for (let i = 4; i >= 0; i--) {
       const weekStart = new Date(now.getTime() - (i + 1) * 7 * 86400000);
-      const weekEnd = new Date(now.getTime() - i * 7 * 86400000);
-      const amount = clientOrders
-        .filter(o => {
-          const d = new Date(o.date);
-          return d >= weekStart && d < weekEnd;
-        })
-        .reduce((sum, o) => sum + o.charge, 0);
+      const weekEnd   = new Date(now.getTime() - i       * 7 * 86400000);
+      const weekOrders = clientOrders.filter(o => {
+        const d = parseD(o.date);
+        return !isNaN(d.getTime()) && d >= weekStart && d < weekEnd;
+      });
+      const amount     = weekOrders.reduce((sum, o) => sum + o.charge, 0);
+      const orderCount = weekOrders.length;
       const label = `${weekEnd.getDate().toString().padStart(2,'0')} ${MONTHS[weekEnd.getMonth()]}`;
-      points.push({ label, amount });
+      points.push({ label, amount, orderCount });
     }
     return points;
   }, [clientOrders]);
@@ -453,6 +520,7 @@ export const ClientDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
+    localStorage.removeItem('smm_client_user_id');
     setClientLoggedIn(false);
     setCurrentClientUser(null);
     setPortalMode('landing');
@@ -472,6 +540,58 @@ export const ClientDashboard: React.FC = () => {
   return (
     <>
     <div className="min-h-screen bg-[#090918] text-[#e0e0ff] font-sans antialiased relative selection:bg-cyan-500/30 selection:text-white pb-20 lg:pb-0">
+
+      {/* Announcement Modal Popup */}
+      {showAnnouncementPopup && announcementText && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+          style={{ backdropFilter: 'blur(6px)', backgroundColor: 'rgba(5,5,20,0.75)' }}
+          onClick={dismissAnnouncement}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl border border-purple-500/40 shadow-2xl overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, #13132a 0%, #0e1a2e 100%)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Glow accent */}
+            <div className="absolute top-0 left-0 right-0 h-1 rounded-t-2xl" style={{ background: 'linear-gradient(90deg, #a855f7, #06b6d4)' }} />
+
+            {/* Close button */}
+            <button
+              onClick={dismissAnnouncement}
+              className="absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-white/10 transition-all duration-150"
+              aria-label="Kapat"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+
+            <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center gap-4">
+              {/* Icon */}
+              <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.25), rgba(6,182,212,0.15))', border: '1px solid rgba(168,85,247,0.35)' }}>
+                <span className="text-2xl">📢</span>
+              </div>
+
+              {/* Title */}
+              <div>
+                <p className="text-[10px] font-semibold tracking-widest uppercase mb-1" style={{ color: '#a78bfa' }}>Sistem Bildirimi</p>
+                <h3 className="text-sm font-semibold text-white leading-snug">{announcementText}</h3>
+              </div>
+
+              {/* Divider */}
+              <div className="w-full h-px bg-white/10" />
+
+              {/* Confirm button */}
+              <button
+                onClick={dismissAnnouncement}
+                className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all duration-200 hover:opacity-90 active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #7c3aed, #0891b2)' }}
+              >
+                Anladım
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* 1. Mobile Sidebar Drawer Overlay & Container */}
       {isMobileMenuOpen && (
@@ -530,7 +650,8 @@ export const ClientDashboard: React.FC = () => {
                   { id: 'my-orders', labelTR: 'Sipariş Geçmişi', labelEN: 'My Order Pipeline', icon: History, badge: activeOrdersCount > 0 ? activeOrdersCount : undefined },
                   { id: 'add-funds', labelTR: 'Bakiye Yükle', labelEN: 'Deposit Assets', icon: Wallet },
                   { id: 'tickets', labelTR: 'Destek Masası', labelEN: 'Support Desk', icon: MessageSquare },
-                  { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code },
+                  { id: 'notifications', labelTR: 'Bildirimler', labelEN: 'Notifications', icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
+                  { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: true },
                 ].map(tab => {
                   const TabIcon = tab.icon;
                   const isSel = activeTab === tab.id;
@@ -551,6 +672,9 @@ export const ClientDashboard: React.FC = () => {
                       <div className="flex items-center gap-3">
                         <TabIcon className={`w-4 h-4 shrink-0 ${isSel ? 'text-cyan-400' : 'text-gray-500'}`} />
                         <span>{currentLanguage === 'TR' ? tab.labelTR : tab.labelEN}</span>
+                        {(tab as any).yakinda && (
+                          <span className="px-1.5 py-0.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[8px] font-bold rounded-full">Yakında</span>
+                        )}
                       </div>
                       {tab.badge !== undefined && (
                         <span className="bg-cyan-500 text-black font-extrabold text-[9px] px-2 py-0.5 rounded-full font-mono">
@@ -565,17 +689,6 @@ export const ClientDashboard: React.FC = () => {
 
             {/* Bottom Actions inside menu drawer */}
             <div className="border-t border-white/5 pt-4 space-y-3">
-              <button
-                onClick={() => {
-                  setPortalMode('admin');
-                  setIsMobileMenuOpen(false);
-                  showToast(currentLanguage === 'TR' ? 'Yönetici Konsoluna Geçildi!' : 'Admin Mode Active', 'success');
-                }}
-                className="w-full py-2.5 bg-purple-950/20 border border-purple-800/35 text-purple-400 hover:text-white text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 cursor-pointer shadow"
-              >
-                <Settings className="w-3.5 h-3.5 text-purple-400 animate-spin-slow" />
-                <span>{currentLanguage === 'TR' ? 'Yönetici Terminali' : 'Admin Terminal'}</span>
-              </button>
 
               <button
                 onClick={() => {
@@ -699,17 +812,6 @@ export const ClientDashboard: React.FC = () => {
             <span>{currentLanguage}</span>
           </button>
 
-          <button
-            onClick={() => {
-              setPortalMode('admin');
-              showToast(currentLanguage === 'TR' ? 'Yönetici Konsoluna Geçildi!' : 'Admin Mode Active', 'success');
-            }}
-            className="px-2.5 sm:px-3.5 py-1.5 bg-purple-950/30 border border-purple-800/45 text-purple-400 text-[9px] sm:text-[10px] font-bold rounded-xl hover:text-white hover:bg-purple-900/30 cursor-pointer shadow-md shadow-black/40 flex items-center gap-1 sm:gap-1.5 transition-all duration-200"
-            title="Yönetici Terminaline Geç"
-          >
-            <Settings className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-spin-slow text-purple-400" />
-            <span className="hidden sm:inline">{currentLanguage === 'TR' ? 'Yönetici Terminali' : 'Admin Terminal'}</span>
-          </button>
 
           {/* Connected profile indicator */}
           <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-white/5">
@@ -798,7 +900,8 @@ export const ClientDashboard: React.FC = () => {
               { id: 'my-orders', labelTR: 'Sipariş Geçmişi', labelEN: 'My Order Pipeline', icon: History, badge: activeOrdersCount > 0 ? activeOrdersCount : undefined },
               { id: 'add-funds', labelTR: 'Bakiye Yükle', labelEN: 'Deposit Assets', icon: Wallet },
               { id: 'tickets', labelTR: 'Destek Masası', labelEN: 'Support Desk', icon: MessageSquare },
-              { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code },
+              { id: 'notifications', labelTR: 'Bildirimler', labelEN: 'Notifications', icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
+              { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: true },
             ].map(tab => {
               const TabIcon = tab.icon;
               const isSel = activeTab === tab.id;
@@ -818,6 +921,9 @@ export const ClientDashboard: React.FC = () => {
                   <div className="flex items-center gap-3">
                     <TabIcon className={`w-4 h-4 shrink-0 transition-transform ${isSel ? 'text-cyan-400 scale-105' : 'text-gray-500 group-hover:text-gray-300 group-hover:scale-105'}`} />
                     <span>{currentLanguage === 'TR' ? tab.labelTR : tab.labelEN}</span>
+                    {(tab as any).yakinda && (
+                      <span className="px-1.5 py-0.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[8px] font-bold rounded-full">Yakında</span>
+                    )}
                   </div>
                   {tab.badge !== undefined && (
                     <span className="bg-cyan-500 text-black font-extrabold text-[9px] px-2 py-0.5 rounded-full font-mono animate-pulse shrink-0">
@@ -2048,6 +2154,87 @@ export const ClientDashboard: React.FC = () => {
                   </div>
                 </div>
 
+              </div>
+
+            </div>
+          )}
+
+          {/* TAB 7: Notifications inbox */}
+          {activeTab === 'notifications' && (
+            <div className="space-y-4 text-xs animate-fade-in">
+
+              <div className="bg-[#121226] border border-white/5 rounded-3xl p-6 shadow-xl">
+                <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-4">
+                  <div>
+                    <h3 className="text-base font-bold font-sora text-white flex items-center gap-2">
+                      <Bell className="w-4.5 h-4.5 text-purple-400" />
+                      <span>{currentLanguage === 'TR' ? 'Sistem Bildirimleri' : 'System Notifications'}</span>
+                      {unreadNotifCount > 0 && (
+                        <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 text-[10px] font-bold rounded-full">
+                          {unreadNotifCount} {currentLanguage === 'TR' ? 'okunmadı' : 'unread'}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {currentLanguage === 'TR' ? 'Yönetim ekibinden gelen önemli duyurular ve bildirimler.' : 'Important announcements and messages from the admin team.'}
+                    </p>
+                  </div>
+                  {unreadNotifCount > 0 && (
+                    <button
+                      onClick={() => markUserNotificationsRead(currentClientUser!.id)}
+                      className="px-3.5 py-2 bg-purple-950/40 border border-purple-700/30 text-purple-300 hover:text-white font-bold rounded-xl transition text-[10px] cursor-pointer"
+                    >
+                      {currentLanguage === 'TR' ? '✓ Tümünü Okundu İşaretle' : '✓ Mark All Read'}
+                    </button>
+                  )}
+                </div>
+
+                {(currentClientUser?.notifications ?? []).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-14 gap-3 text-center">
+                    <div className="w-12 h-12 rounded-2xl bg-white/4 flex items-center justify-center">
+                      <Bell className="w-5 h-5 text-gray-600" />
+                    </div>
+                    <p className="text-gray-500 font-medium">
+                      {currentLanguage === 'TR' ? 'Henüz bir bildiriminiz bulunmuyor.' : 'No notifications yet.'}
+                    </p>
+                    <p className="text-gray-600 text-[10px]">
+                      {currentLanguage === 'TR' ? 'Yönetimden gelen duyurular burada görünecek.' : 'Announcements from the admin team will appear here.'}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2.5">
+                    {(currentClientUser?.notifications ?? []).map((notif) => (
+                      <div
+                        key={notif.id}
+                        className={`flex gap-3.5 p-4 rounded-2xl border transition-all ${
+                          notif.read
+                            ? 'bg-white/2 border-white/5'
+                            : 'bg-purple-950/20 border-purple-700/25'
+                        }`}
+                      >
+                        <div className={`shrink-0 w-8 h-8 rounded-xl flex items-center justify-center mt-0.5 ${
+                          notif.read ? 'bg-white/5' : 'bg-purple-500/20'
+                        }`}>
+                          <Bell className={`w-3.5 h-3.5 ${notif.read ? 'text-gray-500' : 'text-purple-400'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1.5">
+                            <span className={`text-[10px] font-bold uppercase tracking-widest ${notif.read ? 'text-gray-500' : 'text-purple-400'}`}>
+                              {currentLanguage === 'TR' ? 'Yönetim Bildirimi' : 'Admin Notification'}
+                            </span>
+                            <span className="text-[10px] text-gray-600 shrink-0 font-mono">{notif.date}</span>
+                          </div>
+                          <p className={`leading-relaxed ${notif.read ? 'text-gray-400' : 'text-gray-200'}`}>
+                            {notif.text}
+                          </p>
+                        </div>
+                        {!notif.read && (
+                          <div className="shrink-0 w-2 h-2 rounded-full bg-purple-400 mt-1.5" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
             </div>

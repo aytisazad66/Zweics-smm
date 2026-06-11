@@ -13,8 +13,18 @@ import {
   initialPaymentMethods,
   initialPaymentRequests,
   initialTickets,
-  initialApiProviders
+  initialApiProviders,
+  UserNotification
 } from '../data/mockData';
+
+export interface SmtpConfig {
+  host: string;
+  port: string;
+  user: string;
+  pass: string;
+  adminEmail: string;
+  fromName: string;
+}
 
 interface AppContextProps {
   currentTab: string;
@@ -103,6 +113,13 @@ interface AppContextProps {
   placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<string | null>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
+  sendUserNotification: (userId: string, text: string) => void;
+  sendBroadcastNotification: (text: string) => void;
+  markUserNotificationsRead: (userId: string) => void;
+  announcementText: string;
+  setAnnouncementText: (text: string) => void;
+  smtpConfig: SmtpConfig;
+  setSmtpConfig: (cfg: SmtpConfig) => void;
   isServerSynced: boolean;
 }
 
@@ -116,55 +133,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [is2FAVerified, setIs2FAVerified] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<'Süper Admin' | 'Admin' | 'Moderatör'>('Süper Admin');
   
-  const [services, setServices] = useState<Service[]>(() => {
-    const saved = localStorage.getItem('smm_services');
-    return saved ? JSON.parse(saved) : initialServices;
-  });
-  
-  const [orders, setOrders] = useState<Order[]>(() => {
-    const saved = localStorage.getItem('smm_orders');
-    return saved ? JSON.parse(saved) : initialOrders;
-  });
-  
-  const [users, setUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem('smm_users');
-    return saved ? JSON.parse(saved) : initialUsers;
-  });
-  
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(() => {
-    const saved = localStorage.getItem('smm_payment_methods');
-    return saved ? JSON.parse(saved) : initialPaymentMethods;
-  });
-  
-  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>(() => {
-    const saved = localStorage.getItem('smm_payment_requests');
-    return saved ? JSON.parse(saved) : initialPaymentRequests;
-  });
-  
-  const [tickets, setTickets] = useState<Ticket[]>(() => {
-    const saved = localStorage.getItem('smm_tickets');
-    return saved ? JSON.parse(saved) : initialTickets;
-  });
-  
-  const [apiProviders, setApiProviders] = useState<ApiProvider[]>(() => {
-    const saved = localStorage.getItem('smm_api_providers');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as ApiProvider[];
-        const validIds = ['API_TURKPANELI', 'API_RESELLERPROVIDER'];
-        const filtered = parsed.filter(p => validIds.includes(p.id));
-        // Merge with defaults to ensure both providers always exist
-        const merged = initialApiProviders.map(def => {
-          const found = filtered.find(f => f.id === def.id);
-          return found ? { ...def, ...found } : def;
-        });
-        return merged;
-      } catch (e) {
-        // ignore fallback
-      }
-    }
-    return initialApiProviders;
-  });
+  const [services, setServices] = useState<Service[]>(initialServices);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [users, setUsers] = useState<User[]>(initialUsers);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(initialPaymentMethods);
+  const [paymentRequests, setPaymentRequests] = useState<PaymentRequest[]>(initialPaymentRequests);
+  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+  const [apiProviders, setApiProviders] = useState<ApiProvider[]>(initialApiProviders);
   
   const [searchOpen, setSearchOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -173,28 +148,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Client / Landing layout states
   const [portalMode, setPortalMode] = useState<'landing' | 'client' | 'admin'>('landing');
-  const [clientLoggedIn, setClientLoggedIn] = useState<boolean>(() => {
-    return localStorage.getItem('smm_client_logged_in') === 'true';
+  const [clientLoggedIn, setClientLoggedIn] = useState<boolean>(false);
+  const [currentClientUser, setCurrentClientUser] = useState<User | null>(null);
+  const [announcementText, setAnnouncementText] = useState('');
+  const [smtpConfig, setSmtpConfig] = useState<SmtpConfig>({
+    host: '', port: '587', user: '', pass: '', adminEmail: '', fromName: 'Bor Media'
   });
-  const [currentClientUser, setCurrentClientUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('smm_current_client_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-
-  useEffect(() => {
-    localStorage.setItem('smm_client_logged_in', clientLoggedIn.toString());
-  }, [clientLoggedIn]);
-
-  useEffect(() => {
-    if (currentClientUser) {
-      localStorage.setItem('smm_current_client_user', JSON.stringify(currentClientUser));
-    } else {
-      localStorage.removeItem('smm_current_client_user');
-    }
-  }, [currentClientUser]);
   
   const syncDoneRef = useRef(false);
   const [isServerSynced, setIsServerSynced] = useState(false);
+
+  const clientLoggedInRef = useRef(clientLoggedIn);
+  useEffect(() => { clientLoggedInRef.current = clientLoggedIn; }, [clientLoggedIn]);
+  const currentClientUserRef = useRef(currentClientUser);
+  useEffect(() => { currentClientUserRef.current = currentClientUser; }, [currentClientUser]);
 
   const saveToApi = (key: string, value: unknown) => {
     if (!syncDoneRef.current) return;
@@ -205,37 +172,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }).catch(() => {});
   };
 
-  // Persistent Storage (localStorage + server sync)
-  useEffect(() => {
-    localStorage.setItem('smm_services', JSON.stringify(services));
-    saveToApi('smm_services', services);
-  }, [services]);
-  useEffect(() => {
-    localStorage.setItem('smm_orders', JSON.stringify(orders));
-    saveToApi('smm_orders', orders);
-  }, [orders]);
-  useEffect(() => {
-    localStorage.setItem('smm_users', JSON.stringify(users));
-    saveToApi('smm_users', users);
-  }, [users]);
-  useEffect(() => {
-    localStorage.setItem('smm_payment_methods', JSON.stringify(paymentMethods));
-    saveToApi('smm_payment_methods', paymentMethods);
-  }, [paymentMethods]);
-  useEffect(() => {
-    localStorage.setItem('smm_payment_requests', JSON.stringify(paymentRequests));
-    saveToApi('smm_payment_requests', paymentRequests);
-  }, [paymentRequests]);
-  useEffect(() => {
-    localStorage.setItem('smm_tickets', JSON.stringify(tickets));
-    saveToApi('smm_tickets', tickets);
-  }, [tickets]);
-  useEffect(() => {
-    localStorage.setItem('smm_api_providers', JSON.stringify(apiProviders));
-    saveToApi('smm_api_providers', apiProviders);
-  }, [apiProviders]);
+  // Persistent Storage — KV store only (no localStorage)
+  useEffect(() => { saveToApi('smm_services', services); }, [services]);
+  useEffect(() => { saveToApi('smm_orders', orders); }, [orders]);
+  useEffect(() => { saveToApi('smm_users', users); }, [users]);
+  useEffect(() => { saveToApi('smm_payment_methods', paymentMethods); }, [paymentMethods]);
+  useEffect(() => { saveToApi('smm_payment_requests', paymentRequests); }, [paymentRequests]);
+  useEffect(() => { saveToApi('smm_tickets', tickets); }, [tickets]);
+  useEffect(() => { saveToApi('smm_api_providers', apiProviders); }, [apiProviders]);
+  useEffect(() => { saveToApi('smm_announcement', announcementText); }, [announcementText]);
+  useEffect(() => { saveToApi('smm_smtp_config', smtpConfig); }, [smtpConfig]);
 
-  // Load from server on mount (enables cross-device sync)
+  // Admin session persistence — survive F5 / hard refresh (8h TTY)
+  useEffect(() => {
+    if (isLoggedIn) {
+      const session = JSON.parse(localStorage.getItem('bm_admin_session') || '{}');
+      localStorage.setItem('bm_admin_session', JSON.stringify({
+        ...session,
+        isLoggedIn: true,
+        expiry: Date.now() + 8 * 3600_000
+      }));
+    } else {
+      localStorage.removeItem('bm_admin_session');
+    }
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (is2FAVerified && isLoggedIn) {
+      localStorage.setItem('bm_admin_session', JSON.stringify({
+        isLoggedIn: true,
+        is2FAVerified: true,
+        expiry: Date.now() + 8 * 3600_000
+      }));
+    }
+  }, [is2FAVerified]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load from server on mount — DB is the single source of truth
   useEffect(() => {
     const syncFromServer = async () => {
       const entries: [string, React.Dispatch<React.SetStateAction<any>>][] = [
@@ -247,20 +219,123 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         ['smm_tickets', setTickets],
         ['smm_api_providers', setApiProviders],
       ];
+      let loadedUsers: User[] | null = null;
       for (const [key, setter] of entries) {
         try {
           const res = await fetch(`/api/kv/${key}`);
           if (res.ok) {
             const data = await res.json();
-            if (data.value) setter(JSON.parse(data.value));
+            if (data.value) {
+              const parsed = JSON.parse(data.value);
+              setter(parsed);
+              if (key === 'smm_users') loadedUsers = parsed;
+            }
           }
-        } catch { /* server unavailable, use localStorage */ }
+        } catch { /* server unavailable, use initial defaults */ }
       }
+
+      // Load announcement text
+      try {
+        const annRes = await fetch('/api/kv/smm_announcement');
+        if (annRes.ok) {
+          const annData = await annRes.json();
+          if (annData.value) setAnnouncementText(JSON.parse(annData.value));
+        }
+      } catch {}
+
+      // Load SMTP config
+      try {
+        const smtpRes = await fetch('/api/kv/smm_smtp_config');
+        if (smtpRes.ok) {
+          const smtpData = await smtpRes.json();
+          if (smtpData.value) setSmtpConfig(JSON.parse(smtpData.value));
+        }
+      } catch {}
+
+      // Restore client session: only a user ID is persisted locally
+      const storedUserId = localStorage.getItem('smm_client_user_id');
+      if (storedUserId) {
+        const usersToSearch: User[] = loadedUsers ?? initialUsers;
+        const user = usersToSearch.find(u => u.id === storedUserId);
+        if (user && user.status !== 'suspended') {
+          setCurrentClientUser(user);
+          setClientLoggedIn(true);
+          setPortalMode('client');
+        } else {
+          localStorage.removeItem('smm_client_user_id');
+        }
+      }
+
+      // Restore admin session (overrides client if admin was logged in)
+      try {
+        const raw = localStorage.getItem('bm_admin_session');
+        if (raw) {
+          const session = JSON.parse(raw);
+          if (session.expiry > Date.now()) {
+            if (session.isLoggedIn) {
+              setIsLoggedIn(true);
+              setPortalMode('admin');
+            }
+            if (session.is2FAVerified) {
+              setIs2FAVerified(true);
+            }
+          } else {
+            localStorage.removeItem('bm_admin_session');
+          }
+        }
+      } catch { localStorage.removeItem('bm_admin_session'); }
+
       syncDoneRef.current = true;
       setIsServerSynced(true);
     };
     syncFromServer();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Helper: fully log out client and clear session
+  const logoutClient = (showBanMessage = false) => {
+    localStorage.removeItem('smm_client_user_id');
+    setClientLoggedIn(false);
+    setCurrentClientUser(null);
+    setPortalMode('landing');
+    if (showBanMessage) {
+      showToast('Hesabınız askıya alındı. Lütfen destek ekibiyle iletişime geçin.', 'error');
+    }
+  };
+
+  // After server sync: refresh currentClientUser with latest DB data & enforce ban
+  useEffect(() => {
+    if (!isServerSynced || !clientLoggedIn || !currentClientUser) return;
+    const freshUser = users.find(u => u.id === currentClientUser.id);
+    if (!freshUser) { logoutClient(); return; }
+    if (freshUser.status === 'suspended') { logoutClient(true); return; }
+    if (JSON.stringify(freshUser) !== JSON.stringify(currentClientUser)) {
+      setCurrentClientUser(freshUser);
+    }
+  }, [isServerSynced, users]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Poll every 60s: enforce live ban for active client sessions
+  useEffect(() => {
+    if (!isServerSynced) return;
+    const interval = setInterval(async () => {
+      if (!clientLoggedInRef.current || !currentClientUserRef.current) return;
+      try {
+        const res = await fetch('/api/kv/smm_users');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data.value) return;
+        const freshUsers: User[] = JSON.parse(data.value);
+        const freshUser = freshUsers.find(u => u.id === currentClientUserRef.current!.id);
+        if (!freshUser || freshUser.status === 'suspended') {
+          logoutClient(true);
+          return;
+        }
+        if (JSON.stringify(freshUser) !== JSON.stringify(currentClientUserRef.current)) {
+          setCurrentClientUser(freshUser);
+        }
+      } catch { /* network error, skip */ }
+    }, 60_000);
+    return () => clearInterval(interval);
+  }, [isServerSynced]); // eslint-disable-line react-hooks/exhaustive-deps
   
   // Toast and notifications states
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
@@ -811,12 +886,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       email,
       balance: 0,
       totalOrders: 0,
-      joinedDate: new Date().toLocaleDateString('tr-TR'),
+      joinedDate: new Date().toISOString().split('T')[0],
       status: 'active' as const
     };
     setUsers(prev => [...prev, newUser]);
     setCurrentClientUser(newUser);
     setClientLoggedIn(true);
+    localStorage.setItem('smm_client_user_id', newId);
     showToast(currentLanguage === 'TR' ? 'Hesabınız oluşturuldu! Bakiye yükleyerek sipariş verebilirsiniz.' : 'Account created! Add funds to start placing orders.', 'success');
     addNotification(`Yeni bayilik kaydı yapıldı: ${fullName} (${email})`, 'user');
     return true;
@@ -844,7 +920,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     const nowTime = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
-    const nowDate = new Date().toLocaleDateString('tr-TR') + ' ' + nowTime;
+    const nowDate = new Date().toISOString();
     const newOrderId = "ORD-" + Math.floor(Math.random() * 89999 + 10000);
 
     // Deduct balance immediately and create order in "Bekliyor" state
@@ -888,10 +964,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             finalStatus = 'İşlemde';
             orderLogs.push({ time: nowTime, text: `✅ Sipariş başarıyla işleme alındı. Referans No: ${providerOrderId}` });
           } else if (apiResult && apiResult.error) {
-            // Provider returned an error — refund and cancel
-            orderLogs.push({ time: nowTime, text: `❌ Sipariş işlenemedi. Bakiyeniz iade edildi.` });
+            // Check if the provider ran out of balance (not a user error)
+            const errStr = String(apiResult.error).toLowerCase();
+            const isProviderBalanceError = errStr.includes('insufficient') || errStr.includes('balance') || errStr.includes('funds') || errStr.includes('credit') || errStr.includes('bakiye');
+
+            // Refund the user in all error cases
+            orderLogs.push({ time: nowTime, text: isProviderBalanceError ? '⚠️ Servis geçici olarak kullanılamıyor. Bakiyeniz iade edildi.' : `❌ Sipariş işlenemedi. Bakiyeniz iade edildi.` });
             finalStatus = 'İptal';
-            // Refund the user
             setUsers(prev => prev.map(u => {
               if (u.id === currentClientUser.id) {
                 const refunded = { ...u, balance: parseFloat((u.balance + cost).toFixed(2)), totalOrders: u.totalOrders - 1 };
@@ -900,12 +979,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
               return u;
             }));
-            showToast(
-              currentLanguage === 'TR'
-                ? 'Sipariş işlenemedi. Bakiyeniz iade edildi.'
-                : 'Order could not be processed. Your balance has been refunded.',
-              'error'
-            );
+
+            if (isProviderBalanceError) {
+              // Hide provider's internal balance issue — show maintenance message
+              showToast(
+                currentLanguage === 'TR'
+                  ? '⚠️ Bu servis şu an bakımda. Bakiyeniz iade edildi, lütfen daha sonra tekrar deneyiniz.'
+                  : '⚠️ This service is temporarily unavailable. Your balance has been refunded. Please try again later.',
+                'error'
+              );
+            } else {
+              showToast(
+                currentLanguage === 'TR'
+                  ? 'Sipariş işlenemedi. Bakiyeniz iade edildi.'
+                  : 'Order could not be processed. Your balance has been refunded.',
+                'error'
+              );
+            }
+
             const cancelledOrder: Order = {
               id: newOrderId,
               username: username || currentClientUser.fullName,
@@ -921,7 +1012,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               logs: orderLogs,
             };
             setOrders(prev => [cancelledOrder, ...prev]);
-            addNotification(`Sipariş başarısız: ${service.name.substring(0, 20)}`, 'error');
+            addNotification(
+              isProviderBalanceError
+                ? `Servis geçici kullanım dışı: ${service.name.substring(0, 20)} (sağlayıcı bakiyesi yetersiz)`
+                : `Sipariş başarısız: ${service.name.substring(0, 20)}`,
+              'error'
+            );
             return null;
           } else {
             // Unexpected response — keep as Bekliyor, admin will handle
@@ -992,7 +1088,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       amount,
       method: method.name,
       status: 'Beklemede' as const,
-      date: new Date().toLocaleDateString('tr-TR') + ' ' + new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+      date: new Date().toISOString()
     };
     setPaymentRequests(prev => [newRequest, ...prev]);
     showToast(currentLanguage === 'TR' ? 'Ödeme bildiriminiz yöneticilere iletildi. Onaylanınca bakiye yüklenecektir.' : 'Deposit request sent for approval.', 'success');
@@ -1009,7 +1105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       subject,
       priority,
       status: 'Açık' as const,
-      date: new Date().toLocaleDateString('tr-TR'),
+      date: new Date().toISOString().split('T')[0],
       messages: [
         {
           id: Math.random().toString(),
@@ -1023,6 +1119,39 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTickets(prev => [newTicket, ...prev]);
     showToast(currentLanguage === 'TR' ? `Destek talebiniz oluşturuldu! Bildirim ID: ${newTicketId}` : `Support ticket opened! ID: ${newTicketId}`, 'success');
     addNotification(`Müşteri yeni destek talebi açtı: ${newTicketId} - ${subject}`, 'ticket');
+  };
+
+  const sendUserNotification = (userId: string, text: string) => {
+    const newNotif: UserNotification = {
+      id: Math.random().toString(36).substr(2, 9),
+      text,
+      date: new Date().toISOString(),
+      read: false,
+    };
+    setUsers(prev => prev.map(u =>
+      u.id === userId ? { ...u, notifications: [newNotif, ...(u.notifications ?? [])] } : u
+    ));
+  };
+
+  const sendBroadcastNotification = (text: string) => {
+    const date = new Date().toISOString();
+    setUsers(prev => prev.map(u => {
+      const newNotif: UserNotification = { id: Math.random().toString(36).substr(2, 9), text, date, read: false };
+      return { ...u, notifications: [newNotif, ...(u.notifications ?? [])] };
+    }));
+    if (currentClientUser) {
+      const newNotif: UserNotification = { id: Math.random().toString(36).substr(2, 9), text, date, read: false };
+      setCurrentClientUser({ ...currentClientUser, notifications: [newNotif, ...(currentClientUser.notifications ?? [])] });
+    }
+  };
+
+  const markUserNotificationsRead = (userId: string) => {
+    setUsers(prev => prev.map(u =>
+      u.id === userId ? { ...u, notifications: (u.notifications ?? []).map(n => ({ ...n, read: true })) } : u
+    ));
+    if (currentClientUser?.id === userId) {
+      setCurrentClientUser({ ...currentClientUser, notifications: (currentClientUser.notifications ?? []).map(n => ({ ...n, read: true })) });
+    }
   };
 
   
@@ -1062,6 +1191,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       placeClientOrder,
       submitClientPaymentRequest,
       submitClientTicket,
+      sendUserNotification,
+      sendBroadcastNotification,
+      markUserNotificationsRead,
+      announcementText, setAnnouncementText,
+      smtpConfig, setSmtpConfig,
       isServerSynced
     }}>
       {children}

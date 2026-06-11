@@ -2,6 +2,23 @@ Options -MultiViews
 RewriteEngine On
 RewriteBase /
 
+# PHP dosyalarını olduğu gibi sun — SPA fallback'e düşmesin
+RewriteRule ^api-proxy\.php$ - [L]
+RewriteRule ^api-kv\.php$ - [L]
+RewriteRule ^api-mail\.php$ - [L]
+RewriteRule ^api-auth\.php$ - [L]
+
+# /api/kv/{key} isteklerini PHP KV store'a yönlendir
+RewriteRule ^api/kv/([a-zA-Z0-9_]+)$ api-kv.php?key=$1 [L,QSA]
+
+# /api/mail isteklerini PHP mail'e yönlendir
+RewriteRule ^api/mail$ api-mail.php [L,QSA]
+
+# /api/auth/* isteklerini PHP auth'a yönlendir
+RewriteRule ^api/auth/login$ api-auth.php?action=login [L,QSA]
+RewriteRule ^api/auth/set-credentials$ api-auth.php?action=set-credentials [L,QSA]
+
+# SPA fallback — tüm diğer route'ları React'a gönder
 RewriteRule ^index\.html$ - [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d

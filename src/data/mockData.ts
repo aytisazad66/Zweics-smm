@@ -30,6 +30,13 @@ export interface Order {
   providerApiId?: string;
 }
 
+export interface UserNotification {
+  id: string;
+  text: string;
+  date: string;
+  read: boolean;
+}
+
 export interface User {
   id: string;
   fullName: string;
@@ -39,6 +46,7 @@ export interface User {
   joinedDate: string;
   status: 'active' | 'suspended';
   note?: string;
+  notifications?: UserNotification[];
 }
 
 export interface PaymentMethod {

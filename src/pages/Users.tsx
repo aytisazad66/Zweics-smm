@@ -14,7 +14,8 @@ export const Users: React.FC = () => {
     deductBalance, 
     toggleUserStatus, 
     addUserNote,
-    showToast 
+    showToast,
+    sendUserNotification
   } = useAppState();
 
   const [search, setSearch] = useState('');
@@ -62,8 +63,9 @@ export const Users: React.FC = () => {
     e.preventDefault();
     if (!msgUser || !msgText.trim()) return;
 
+    sendUserNotification(msgUser.id, msgText.trim());
     showToast(
-      currentLanguage === 'TR' ? `${msgUser.fullName} adlı kullanıcıya mesajınız e-posta ve panel içi bilet olarak iletildi.` : `Administrative memo forwarded to ${msgUser.fullName} as dispatch mail.`,
+      currentLanguage === 'TR' ? `${msgUser.fullName} adlı kullanıcıya sistem bildirimi iletildi.` : `System notification delivered to ${msgUser.fullName}.`,
       'success'
     );
     setMsgUser(null);

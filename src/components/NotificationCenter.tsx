@@ -107,7 +107,7 @@ export const NotificationCenter: React.FC = () => {
           {/* Footer view */}
           <div className="p-3 bg-[#0a0a14] border-t border-white/5 text-center">
             <span className="text-[10px] text-gray-500 font-semibold tracking-wider uppercase">
-              SMM PRO SECURITY GUARD ENGINE
+              BOR MEDIA SECURITY GUARD ENGINE
             </span>
           </div>
         </div>
