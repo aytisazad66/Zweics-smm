@@ -252,17 +252,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       } catch {}
 
-      // Restore client session: only a user ID is persisted locally
+      // Load admin notifications from KV
+      try {
+        const notifRes = await fetch('/api/kv/smm_notifications');
+        if (notifRes.ok) {
+          const notifData = await notifRes.json();
+          if (notifData.value) setNotifications(JSON.parse(notifData.value));
+        }
+      } catch {}
+
+      // Restore client session: try from KV users, fallback to sessionStorage cache
       const storedUserId = sessionStorage.getItem('smm_client_user_id');
       if (storedUserId) {
         const usersToSearch: User[] = loadedUsers ?? initialUsers;
-        const user = usersToSearch.find(u => u.id === storedUserId);
+        let user = usersToSearch.find(u => u.id === storedUserId);
+        if (!user) {
+          // Fallback to locally cached user object if KV load failed
+          try {
+            const cached = sessionStorage.getItem('smm_client_user_cache');
+            if (cached) user = JSON.parse(cached) as User;
+          } catch {}
+        }
         if (user && user.status !== 'suspended') {
           setCurrentClientUser(user);
           setClientLoggedIn(true);
           setPortalMode('client');
+          // Refresh cache with latest server data
+          if (loadedUsers) sessionStorage.setItem('smm_client_user_cache', JSON.stringify(user));
         } else {
           sessionStorage.removeItem('smm_client_user_id');
+          sessionStorage.removeItem('smm_client_user_cache');
         }
       }
 
@@ -291,9 +310,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     syncFromServer();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 5-minute inactivity auto-logout
+  useEffect(() => {
+    const INACTIVITY_MS = 5 * 60 * 1000;
+    let timer: ReturnType<typeof setTimeout>;
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        if (clientLoggedInRef.current) {
+          sessionStorage.removeItem('smm_client_user_id');
+          sessionStorage.removeItem('smm_client_user_cache');
+          setClientLoggedIn(false);
+          setCurrentClientUser(null);
+          setPortalMode('landing');
+        }
+        if (isLoggedIn) {
+          sessionStorage.removeItem('bm_admin_session');
+          setIsLoggedIn(false);
+          setIs2FAVerified(false);
+          setPortalMode('landing');
+        }
+      }, INACTIVITY_MS);
+    };
+    const events = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      clearTimeout(timer);
+      events.forEach(e => window.removeEventListener(e, reset));
+    };
+  }, [isLoggedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Helper: fully log out client and clear session
   const logoutClient = (showBanMessage = false) => {
     sessionStorage.removeItem('smm_client_user_id');
+    sessionStorage.removeItem('smm_client_user_cache');
     setClientLoggedIn(false);
     setCurrentClientUser(null);
     setPortalMode('landing');
@@ -339,12 +390,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Toast and notifications states
   const [toastMsg, setToastMsg] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
-  const [notifications, setNotifications] = useState<{ id: string; text: string; time: string; read: boolean; type: string }[]>([
-    { id: "1", text: "Yeni ödeme bildirimi alındı (Kerem Taş - 250 TL)", time: "18 dk önce", read: false, type: "payment" },
-    { id: "2", text: "Yeni destek talebi açıldı (T-503 - Ezgi Şen)", time: "42 dk önce", read: false, type: "ticket" },
-    { id: "3", text: "Sistem: Şüpheli giriş tespiti! Admin (Salih) IP: 192.168.1.10", time: "1 saat önce", read: true, type: "security" },
-    { id: "4", text: "Stripe global servisinde API hatası oluştu", time: "2 saat önce", read: true, type: "error" }
-  ]);
+  const [notifications, setNotifications] = useState<{ id: string; text: string; time: string; read: boolean; type: string }[]>([]);
+  useEffect(() => { saveToApi('smm_notifications', notifications); }, [notifications]);
   
   const showToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToastMsg({ text, type });

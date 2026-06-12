@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppState } from '../context/AppContext';
+import { BorMediaLogo } from '../components/BorMediaLogo';
 import { 
   Zap, 
   TrendingUp, 
@@ -61,6 +62,12 @@ export const Landing: React.FC = () => {
   const [forgotMailError, setForgotMailError] = useState('');
   const [forgotFallbackCode, setForgotFallbackCode] = useState('');
   const [forgotNewPassStep, setForgotNewPassStep] = useState(false);
+  const [regOtpStep, setRegOtpStep] = useState(false);
+  const [regOtpInput, setRegOtpInput] = useState('');
+  const [regOtpCode, setRegOtpCode] = useState('');
+  const [regOtpLoading, setRegOtpLoading] = useState(false);
+  const [regOtpError, setRegOtpError] = useState('');
+  const [regFallbackCode, setRegFallbackCode] = useState('');
   const [forgotNewPass, setForgotNewPass] = useState('');
   const [forgotNewPass2, setForgotNewPass2] = useState('');
   const [forgotNewPassLoading, setForgotNewPassLoading] = useState(false);
@@ -274,6 +281,7 @@ export const Landing: React.FC = () => {
       return;
     }
     sessionStorage.setItem('smm_client_user_id', user.id);
+    sessionStorage.setItem('smm_client_user_cache', JSON.stringify(user));
     setCurrentClientUser(user as any);
     setClientLoggedIn(true);
     setPortalMode('client');
@@ -281,18 +289,76 @@ export const Landing: React.FC = () => {
     showToast(currentLanguage === 'TR' ? `Tekrar hoş geldiniz, Sayın ${user.fullName}!` : `Welcome back, ${user.fullName}!`, 'success');
   };
 
+  const handleSendRegOtp = async () => {
+    if (!authFullName || !authEmail || !authPassword) {
+      showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurun.' : 'Please fill all fields.', 'error');
+      return;
+    }
+    // Check if email already in use
+    const existing = users.some(u => u.email.toLowerCase() === authEmail.toLowerCase());
+    if (existing) {
+      showToast(currentLanguage === 'TR' ? 'Bu e-posta adresiyle zaten bir hesap var.' : 'Email already registered.', 'error');
+      return;
+    }
+    setRegOtpLoading(true);
+    setRegOtpError('');
+    setRegFallbackCode('');
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    setRegOtpCode(code);
+    // Store OTP on server with 10-min expiry
+    const safeEmail = authEmail.replace(/[^a-zA-Z0-9_]/g, '_');
+    try {
+      await fetch(`/api/kv/smm_otp_${safeEmail}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ value: JSON.stringify({ code, expiry: Date.now() + 600_000 }) })
+      });
+    } catch {}
+    try {
+      const mailRes = await fetch('/api/mail', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          to: authEmail,
+          subject: 'Bor Media - E-posta Doğrulama Kodu',
+          html: `<div style="font-family:sans-serif;background:#0d0d1f;color:#eee;padding:32px;border-radius:16px;max-width:480px;margin:auto">
+            <h2 style="color:#00D4FF;margin-bottom:8px">Bor Media SMM Panel</h2>
+            <p>Kayıt için e-posta doğrulama kodunuz:</p>
+            <div style="font-size:32px;font-weight:900;color:#7B2FFF;letter-spacing:8px;margin:24px 0;padding:16px;background:#1a1a3e;border-radius:12px;text-align:center">${code}</div>
+            <p style="color:#aaa;font-size:12px">Bu kod 10 dakika geçerlidir. Kodu kimseyle paylaşmayın.</p>
+          </div>`
+        })
+      });
+      if (!mailRes.ok) {
+        setRegFallbackCode(code);
+        setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodu: ${code}` : `Mail failed. Your code: ${code}`);
+      }
+    } catch {
+      setRegFallbackCode(code);
+      setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodu: ${code}` : `Mail failed. Your code: ${code}`);
+    }
+    setRegOtpLoading(false);
+    setRegOtpStep(true);
+  };
+
+  const handleVerifyRegOtp = () => {
+    if (regOtpInput.trim() !== regOtpCode) {
+      setRegOtpError(currentLanguage === 'TR' ? 'Yanlış kod. Lütfen tekrar deneyin.' : 'Wrong code. Please try again.');
+      return;
+    }
+    setRegOtpError('');
+    const success = registerClient(authFullName, authEmail);
+    if (success) {
+      setRegOtpStep(false);
+      setAuthModalOpen(false);
+    }
+  };
+
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (authTab === 'register') {
-      if (!authFullName || !authEmail || !authPassword) {
-        showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurun.' : 'Please fill all fields.', 'error');
-        return;
-      }
-      const success = registerClient(authFullName, authEmail);
-      if (success) {
-        setAuthModalOpen(false);
-        setPortalMode('client');
-      }
+      await handleSendRegOtp();
+      return;
     } else {
       if (!authEmail || !authPassword) {
         showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurun.' : 'Please fill all fields.', 'error');
@@ -341,6 +407,7 @@ export const Landing: React.FC = () => {
       if (isDemo || authPassword === 'password123') {
         const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
         sessionStorage.setItem('smm_client_user_id', targetUser.id);
+        sessionStorage.setItem('smm_client_user_cache', JSON.stringify(targetUser));
         setCurrentClientUser(targetUser as any);
         setClientLoggedIn(true);
         setPortalMode('client');
@@ -375,19 +442,7 @@ export const Landing: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
 
           {/* Logo brand */}
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#00D4FF] to-[#7B2FFF] flex items-center justify-center font-bold text-white shadow-lg shadow-blue-500/15">
-              BM
-            </div>
-            <div>
-              <span className="font-bold text-lg font-sora text-white tracking-wide block leading-none">
-                Bor Media
-              </span>
-              <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest mt-0.5 block">
-                SMM PANEL
-              </span>
-            </div>
-          </div>
+          <BorMediaLogo size="sm" />
 
           {/* Desktop Nav Items */}
           <div className="hidden md:flex items-center gap-8 text-xs font-semibold text-gray-300">
@@ -1076,6 +1131,53 @@ export const Landing: React.FC = () => {
                     </button>
                   </>
                 )}
+              </div>
+            ) : regOtpStep ? (
+              <div className="space-y-4 text-xs">
+                <div className="text-center space-y-1 pb-1">
+                  <div className="w-12 h-12 rounded-full bg-purple-500/15 border border-purple-500/30 flex items-center justify-center mx-auto mb-3">
+                    <svg className="w-6 h-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                  </div>
+                  <p className="text-white font-bold text-sm">{currentLanguage === 'TR' ? 'E-postanı Doğrula' : 'Verify Your Email'}</p>
+                  <p className="text-[11px] text-gray-400">
+                    {currentLanguage === 'TR' ? `${authEmail} adresine 6 haneli kod gönderildi.` : `6-digit code sent to ${authEmail}.`}
+                  </p>
+                </div>
+                {regOtpError && (
+                  <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-xl text-yellow-400 text-[11px] font-semibold text-center">
+                    {regOtpError}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <label className="text-gray-400 tracking-wide uppercase font-bold text-[10px]">{currentLanguage === 'TR' ? 'Doğrulama Kodu' : 'Verification Code'}</label>
+                  <input
+                    type="text"
+                    maxLength={6}
+                    autoFocus
+                    className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400 text-center text-xl font-mono font-black tracking-widest"
+                    placeholder="______"
+                    value={regOtpInput}
+                    onChange={(e) => setRegOtpInput(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleVerifyRegOtp(); }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleVerifyRegOtp}
+                  disabled={regOtpInput.length < 6}
+                  className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span>{currentLanguage === 'TR' ? 'Doğrula ve Hesabı Oluştur' : 'Verify & Create Account'}</span>
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <div className="flex items-center justify-between pt-1">
+                  <button type="button" onClick={() => { setRegOtpStep(false); setRegOtpInput(''); setRegOtpError(''); setRegFallbackCode(''); }} className="text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition">
+                    {currentLanguage === 'TR' ? '← Geri Dön' : '← Go Back'}
+                  </button>
+                  <button type="button" onClick={handleSendRegOtp} disabled={regOtpLoading} className="text-[11px] text-gray-500 hover:text-cyan-400 cursor-pointer transition disabled:opacity-50">
+                    {currentLanguage === 'TR' ? 'Kodu Tekrar Gönder' : 'Resend Code'}
+                  </button>
+                </div>
               </div>
             ) : (
               <form onSubmit={handleAuthSubmit} className="space-y-4 text-xs">

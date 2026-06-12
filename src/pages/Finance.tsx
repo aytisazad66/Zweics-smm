@@ -24,8 +24,10 @@ export const Finance: React.FC = () => {
   const [editInstructions, setEditInstructions] = useState('');
 
   const approvedClaims = paymentRequests.filter(r => r.status === 'Onaylandı');
-  const todayClaims = approvedClaims.slice(0, 3).reduce((sum, r) => sum + r.amount, 0);
-  const totalApprovedTotal = approvedClaims.reduce((sum, r) => sum + r.amount, 0) + 12000;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayClaims = approvedClaims.filter(r => r.date && r.date.startsWith(todayStr)).reduce((sum, r) => sum + r.amount, 0);
+  const totalApprovedTotal = approvedClaims.reduce((sum, r) => sum + r.amount, 0);
+  const totalOrders = approvedClaims.length;
 
   const handleUpdateCommission = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,7 +59,7 @@ export const Finance: React.FC = () => {
           </p>
           <span className="text-[9px] text-emerald-400 mt-2.5 block flex items-center gap-1 font-semibold">
             <TrendingUp className="w-3.5 h-3.5" />
-            <span>+15% {currentLanguage === 'TR' ? 'dünceye göre' : 'vs yesterday'}</span>
+            <span>{totalOrders} {currentLanguage === 'TR' ? 'onaylı işlem' : 'approved transactions'}</span>
           </span>
         </div>
 

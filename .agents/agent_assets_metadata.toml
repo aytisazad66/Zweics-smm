@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "de4smy1KWY-e9xy3Br8x0"
+uri = "file://bormedya-cpanel.zip"
+type = "unspecified"
+title = "bormedya-cpanel.zip — cPanel'e yüklemek için"

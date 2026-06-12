@@ -37,8 +37,8 @@ export const Dashboard: React.FC = () => {
   const processingOrders = orders.filter(o => o.status === 'İşlemde').length;
   const pendingOrders = orders.filter(o => o.status === 'Bekliyor').length;
   
-  // Calculate today's orders (simulate mock count)
-  const todayOrders = orders.slice(0, 4).length;
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayOrders = orders.filter(o => o.date && o.date.startsWith(todayStr)).length;
 
   const totalUsers = users.length;
   const activeUsers = users.filter(u => u.status === 'active').length;

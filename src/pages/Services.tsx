@@ -34,6 +34,8 @@ export const Services: React.FC = () => {
 
   const [activePlatform, setActivePlatform] = useState<string>('Instagram');
   const [markupPercent, setMarkupPercent] = useState('');
+  const [servicesPage, setServicesPage] = useState(1);
+  const SERVICES_PER_PAGE = 20;
   
   // Modals state management
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -53,6 +55,8 @@ export const Services: React.FC = () => {
   const filteredServices = services
     .filter(s => s.platform === activePlatform)
     .sort((a,b) => a.sortOrder - b.sortOrder);
+  const totalServicePages = Math.ceil(filteredServices.length / SERVICES_PER_PAGE);
+  const pagedServices = filteredServices.slice((servicesPage - 1) * SERVICES_PER_PAGE, servicesPage * SERVICES_PER_PAGE);
 
   // Bulk Price Adjuster
   const handleBulkMarkup = (e: React.FormEvent) => {
@@ -189,7 +193,7 @@ export const Services: React.FC = () => {
           <button
             id={`platform-tab-btn-${plat}`}
             key={plat}
-            onClick={() => setActivePlatform(plat)}
+            onClick={() => { setActivePlatform(plat); setServicesPage(1); }}
             className={`flex items-center gap-2 px-5 py-3 text-xs font-semibold rounded-xl transition cursor-pointer ${activePlatform === plat ? 'bg-[#181832] text-[#00D4FF] shadow border border-white/5' : 'hover:bg-white/5 text-gray-500 hover:text-gray-300'}`}
           >
             {getPlatformIcon(plat)}
@@ -206,7 +210,7 @@ export const Services: React.FC = () => {
               <span>{activePlatform} {currentLanguage === 'TR' ? 'Servis Rehberi' : 'SMM Catalog'}</span>
               <span className="text-[10px] font-mono font-black bg-[#00D4FF]/10 text-cyan-400 px-1.5 py-0.5 rounded-md border border-cyan-800/20">{filteredServices.length} Adet</span>
             </h3>
-            <p className="text-[11px] text-gray-500 font-medium">Sürükle-bırak hassasiyetli sıralama yönetimi ok tuşlarıyladır.</p>
+            <p className="text-[11px] text-gray-500 font-medium">Sayfa {servicesPage}/{totalServicePages || 1} • Toplam {filteredServices.length} hizmet • 20'şer görüntüleniyor</p>
           </div>
         </div>
 
@@ -217,7 +221,8 @@ export const Services: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-3.5">
-            {filteredServices.map((service, index) => {
+            {pagedServices.map((service, index) => {
+              const index_in_filtered = (servicesPage - 1) * SERVICES_PER_PAGE + index;
               const fromIdxInOriginal = services.findIndex(s => s.id === service.id);
               
               return (
@@ -232,30 +237,30 @@ export const Services: React.FC = () => {
                       <button
                         id={`move-up-service-${service.id}`}
                         onClick={() => {
-                          if (index > 0) {
-                            const previousS = filteredServices[index - 1];
+                          if (index_in_filtered > 0) {
+                            const previousS = filteredServices[index_in_filtered - 1];
                             const fromIdx = services.findIndex(s => s.id === service.id);
                             const toIdx = services.findIndex(s => s.id === previousS.id);
                             reorderServices(fromIdx, toIdx);
                           }
                         }}
-                        disabled={index === 0}
-                        className={`p-1.5 hover:bg-white/5 text-gray-600 rounded-lg transition ${index === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:text-cyan-400 cursor-pointer'}`}
+                        disabled={index_in_filtered === 0}
+                        className={`p-1.5 hover:bg-white/5 text-gray-600 rounded-lg transition ${index_in_filtered === 0 ? 'opacity-25 cursor-not-allowed' : 'hover:text-cyan-400 cursor-pointer'}`}
                       >
                         <ArrowUp className="w-3.5 h-3.5" />
                       </button>
                       <button
                         id={`move-down-service-${service.id}`}
                         onClick={() => {
-                          if (index < filteredServices.length - 1) {
-                            const nextS = filteredServices[index + 1];
+                          if (index_in_filtered < filteredServices.length - 1) {
+                            const nextS = filteredServices[index_in_filtered + 1];
                             const fromIdx = services.findIndex(s => s.id === service.id);
                             const toIdx = services.findIndex(s => s.id === nextS.id);
                             reorderServices(fromIdx, toIdx);
                           }
                         }}
-                        disabled={index === filteredServices.length - 1}
-                        className={`p-1.5 hover:bg-white/5 text-gray-600 rounded-lg transition ${index === filteredServices.length - 1 ? 'opacity-25 cursor-not-allowed' : 'hover:text-cyan-400 cursor-pointer'}`}
+                        disabled={index_in_filtered === filteredServices.length - 1}
+                        className={`p-1.5 hover:bg-white/5 text-gray-600 rounded-lg transition ${index_in_filtered === filteredServices.length - 1 ? 'opacity-25 cursor-not-allowed' : 'hover:text-cyan-400 cursor-pointer'}`}
                       >
                         <ArrowDown className="w-3.5 h-3.5" />
                       </button>
@@ -317,6 +322,34 @@ export const Services: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalServicePages > 1 && (
+          <div className="flex items-center justify-between mt-5 pt-4 border-t border-white/5">
+            <p className="text-[11px] text-gray-500">
+              {(servicesPage - 1) * SERVICES_PER_PAGE + 1}–{Math.min(servicesPage * SERVICES_PER_PAGE, filteredServices.length)} / {filteredServices.length} hizmet
+            </p>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setServicesPage(p => Math.max(1, p - 1))}
+                disabled={servicesPage === 1}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+              >← Önceki</button>
+              {Array.from({ length: totalServicePages }, (_, i) => i + 1).map(p => (
+                <button
+                  key={p}
+                  onClick={() => setServicesPage(p)}
+                  className={`w-7 h-7 text-[11px] font-bold rounded-lg transition cursor-pointer ${p === servicesPage ? 'bg-cyan-500 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}
+                >{p}</button>
+              ))}
+              <button
+                onClick={() => setServicesPage(p => Math.min(totalServicePages, p + 1))}
+                disabled={servicesPage === totalServicePages}
+                className="px-3 py-1.5 text-[11px] font-bold rounded-lg bg-white/5 border border-white/10 text-gray-400 hover:text-white hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer transition"
+              >Sonraki →</button>
+            </div>
           </div>
         )}
       </div>

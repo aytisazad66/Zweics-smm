@@ -1,0 +1,8 @@
+- [Session cache fallback](session-cache.md) — client session must cache full user object in smm_client_user_cache so KV failures don't force logout
+- [Registration OTP](reg-otp.md) — email OTP before registerClient(); fallback shows code on screen if SMTP fails; state: regOtpStep/regOtpCode/regOtpInput/regFallbackCode
+- [Notifications KV](notifications-kv.md) — admin notifications saved to smm_notifications KV key; loaded on syncFromServer; useEffect MUST be placed after notifications useState declaration
+- [Inactivity timeout](inactivity-timer.md) — 5-min inactivity auto-logout for both admin and client; listens to click/keydown/mousemove/touchstart/scroll; useEffect depends on isLoggedIn
+- [Finance real data](finance-real.md) — todayClaims filters by today's ISO date string, totalApprovedTotal has no hardcoded offset; todayStr = new Date().toISOString().split('T')[0]
+- [Services pagination](services-pagination.md) — 20 services per page; pagedServices derived from filteredServices; page resets on platform change; index_in_filtered used for arrow buttons
+- [Logo component](logo-component.md) — BorMediaLogo at src/components/BorMediaLogo.tsx; SVG circle with gradient + text; size prop: sm/md/lg
+- [cPanel build](cpanel-build.md) — bormedya-cpanel.zip and bormedya-cpanel.tar.gz in project root; vite build copies PHP/htaccess files from public/
