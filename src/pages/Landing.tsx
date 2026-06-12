@@ -314,28 +314,40 @@ export const Landing: React.FC = () => {
         body: JSON.stringify({ value: JSON.stringify({ code, expiry: Date.now() + 600_000 }) })
       });
     } catch {}
-    try {
-      const mailRes = await fetch('/api/mail', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          to: authEmail,
-          subject: 'Bor Media - E-posta Doğrulama Kodu',
-          html: `<div style="font-family:sans-serif;background:#0d0d1f;color:#eee;padding:32px;border-radius:16px;max-width:480px;margin:auto">
-            <h2 style="color:#00D4FF;margin-bottom:8px">Bor Media SMM Panel</h2>
-            <p>Kayıt için e-posta doğrulama kodunuz:</p>
-            <div style="font-size:32px;font-weight:900;color:#7B2FFF;letter-spacing:8px;margin:24px 0;padding:16px;background:#1a1a3e;border-radius:12px;text-align:center">${code}</div>
-            <p style="color:#aaa;font-size:12px">Bu kod 10 dakika geçerlidir. Kodu kimseyle paylaşmayın.</p>
-          </div>`
-        })
-      });
-      if (!mailRes.ok) {
-        setRegFallbackCode(code);
-        setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodu: ${code}` : `Mail failed. Your code: ${code}`);
-      }
-    } catch {
+    const smtpReady = !!(smtpConfig?.host && smtpConfig?.user && smtpConfig?.pass);
+    if (!smtpReady) {
       setRegFallbackCode(code);
-      setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodu: ${code}` : `Mail failed. Your code: ${code}`);
+      setRegOtpError(currentLanguage === 'TR' ? `SMTP ayarlanmamış. Doğrulama kodunuz: ${code}` : `SMTP not configured. Your code: ${code}`);
+    } else {
+      try {
+        const mailRes = await fetch('/api/mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: authEmail,
+            subject: 'Bor Media - E-posta Doğrulama Kodu',
+            body: `<div style="font-family:sans-serif;background:#0d0d1f;color:#eee;padding:32px;border-radius:16px;max-width:480px;margin:auto">
+              <h2 style="color:#00D4FF;margin-bottom:8px">Bor Media SMM Panel</h2>
+              <p>Kayıt için e-posta doğrulama kodunuz:</p>
+              <div style="font-size:32px;font-weight:900;color:#7B2FFF;letter-spacing:8px;margin:24px 0;padding:16px;background:#1a1a3e;border-radius:12px;text-align:center">${code}</div>
+              <p style="color:#aaa;font-size:12px">Bu kod 10 dakika geçerlidir. Kodu kimseyle paylaşmayın.</p>
+            </div>`,
+            smtp_host: smtpConfig.host,
+            smtp_port: smtpConfig.port,
+            smtp_user: smtpConfig.user,
+            smtp_pass: smtpConfig.pass,
+            from_name: smtpConfig.fromName || 'Bor Media'
+          })
+        });
+        const mailData = await mailRes.json();
+        if (!mailData.ok) {
+          setRegFallbackCode(code);
+          setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodunuz: ${code}` : `Mail failed. Your code: ${code}`);
+        }
+      } catch {
+        setRegFallbackCode(code);
+        setRegOtpError(currentLanguage === 'TR' ? `E-posta gönderilemedi. Doğrulama kodunuz: ${code}` : `Mail failed. Your code: ${code}`);
+      }
     }
     setRegOtpLoading(false);
     setRegOtpStep(true);
