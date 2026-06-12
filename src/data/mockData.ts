@@ -667,21 +667,12 @@ const _removedDemoTickets = [
 export const initialApiProviders: ApiProvider[] = [
   {
     id: "API_TURKPANELI",
-    name: "TurkPaneli.com - Türk Kullanıcılar",
+    name: "TurkPaneli.com",
     url: "https://turkpaneli.com/api/v2",
     key: "",
     status: true,
     balance: undefined,
     region: "TR"
-  },
-  {
-    id: "API_RESELLERPROVIDER",
-    name: "ResellerProvider.com - Global Users",
-    url: "https://resellerprovider.com/api/v2",
-    key: "",
-    status: true,
-    balance: undefined,
-    region: "GLOBAL"
   }
 ];
 

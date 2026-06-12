@@ -8,7 +8,6 @@ import nodemailer from 'nodemailer';
 
 const ALLOWED_API_URLS = [
   'https://turkpaneli.com/api/v2',
-  'https://resellerprovider.com/api/v2',
 ];
 
 function smmProxyPlugin(): Plugin {

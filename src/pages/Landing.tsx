@@ -1244,13 +1244,13 @@ export const Landing: React.FC = () => {
 
                 <button
                   type="submit"
-                  disabled={authLoading}
+                  disabled={authLoading || regOtpLoading}
                   className="w-full py-3.5 mt-2 bg-gradient-to-r from-cyan-400 to-purple-500 text-white text-xs font-bold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-60 disabled:cursor-wait"
                 >
-                  {authLoading ? (
+                  {(authLoading || regOtpLoading) ? (
                     <>
                       <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>{currentLanguage === 'TR' ? 'Hesap aranıyor...' : 'Looking up account...'}</span>
+                      <span>{regOtpLoading ? (currentLanguage === 'TR' ? 'Doğrulama kodu gönderiliyor...' : 'Sending verification code...') : (currentLanguage === 'TR' ? 'Hesap aranıyor...' : 'Looking up account...')}</span>
                     </>
                   ) : (
                     <>

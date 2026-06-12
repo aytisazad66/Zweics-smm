@@ -850,10 +850,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return 0;
       }
 
+      // Speed keywords for "fastest" detection
+      const speedKeywords = ['hızlı', 'hizli', 'fast', 'instant', 'süper', 'super', 'express', 'anlık', 'anlik', 'speed', 'hız', 'hiz'];
+      const isSpeedService = (name: string) => {
+        const lower = name.toLowerCase();
+        return speedKeywords.some(kw => lower.includes(kw));
+      };
+
+      // Group all valid items by category
+      type RawItem = { service?: any; id?: any; name?: any; category?: any; type?: any; rate?: any; min?: any; max?: any };
+      const byCategory = new Map<string, RawItem[]>();
+      (payload as RawItem[]).forEach(item => {
+        const category = String(item.category ?? item.type ?? 'Genel');
+        if (!byCategory.has(category)) byCategory.set(category, []);
+        byCategory.get(category)!.push(item);
+      });
+
+      // For each category: pick the cheapest + the fastest (if different)
+      const selectedItems: RawItem[] = [];
+      byCategory.forEach(items => {
+        if (items.length === 0) return;
+        // Cheapest = lowest rate
+        const cheapest = items.reduce((best, cur) =>
+          parseFloat(cur.rate ?? '999999') < parseFloat(best.rate ?? '999999') ? cur : best
+        );
+        selectedItems.push(cheapest);
+        // Fastest = speed keyword in name, lowest rate among those
+        const speedItems = items.filter(i => isSpeedService(String(i.name ?? '')));
+        if (speedItems.length > 0) {
+          const fastest = speedItems.reduce((best, cur) =>
+            parseFloat(cur.rate ?? '999999') < parseFloat(best.rate ?? '999999') ? cur : best
+          );
+          const cheapestId = String(cheapest.service ?? cheapest.id ?? '');
+          const fastestId = String(fastest.service ?? fastest.id ?? '');
+          if (fastestId !== cheapestId) selectedItems.push(fastest);
+        }
+      });
+
       let addedCount = 0;
       const newServices: Service[] = [];
 
-      payload.forEach((item: any) => {
+      selectedItems.forEach(item => {
         const serviceId = String(item.service ?? item.id ?? '');
         const already = services.some(s => s.providerServiceId === Number(serviceId) && s.providerApiId === providerId);
         if (already) return;
@@ -865,7 +902,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const max = parseInt(item.max ?? '10000', 10);
         const platform = detectPlatformFromName(name, category);
 
-        const markup = provider.region === 'TR' ? 1.3 : 1.35;
+        const markup = 1.3;
         const pricePer1000 = parseFloat((rate * markup).toFixed(2));
 
         const newService: Service = {
@@ -890,21 +927,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setServices(prev => [...prev, ...newServices]);
         addNotification(
           currentLanguage === 'TR'
-            ? `${provider.name} kaynağından ${addedCount} yeni servis aktarıldı.`
-            : `${addedCount} services imported from ${provider.name}.`,
+            ? `${provider.name} kaynağından ${addedCount} yeni servis aktarıldı (her kategoriden en ucuz + en hızlı).`
+            : `${addedCount} services imported from ${provider.name} (cheapest + fastest per category).`,
           "service"
         );
         showToast(
           currentLanguage === 'TR'
-            ? `✅ ${addedCount} servis başarıyla içe aktarıldı!`
+            ? `✅ ${addedCount} servis içe aktarıldı!`
             : `✅ ${addedCount} services imported successfully!`,
           "success"
         );
       } else {
         showToast(
           currentLanguage === 'TR'
-            ? 'Tüm servisler zaten mevcut, yeni servis eklenmedi.'
-            : 'All services already imported. Nothing new to add.',
+            ? 'Tüm seçili servisler zaten mevcut, yeni servis eklenmedi.'
+            : 'All selected services already imported. Nothing new to add.',
           "info"
         );
       }

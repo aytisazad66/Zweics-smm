@@ -94,22 +94,17 @@ export const ApiConfig: React.FC = () => {
   return (
     <div className="space-y-6 animate-fade-in text-[#eeeeff]">
 
-      {/* Info banner: routing logic */}
+      {/* Info banner */}
       <div className="glass-panel p-4 rounded-2xl border border-cyan-800/20 bg-cyan-950/10 flex items-start gap-3">
         <AlertTriangle className="w-4 h-4 text-cyan-400 mt-0.5 shrink-0" />
         <div className="space-y-1">
           <p className="text-xs font-bold text-cyan-300">
-            {currentLanguage === 'TR' ? 'Çift Sağlayıcı Yönlendirme Sistemi' : 'Dual Provider Routing System'}
+            {currentLanguage === 'TR' ? 'Tek Sağlayıcı Sistemi — TurkPaneli.com' : 'Single Provider System — TurkPaneli.com'}
           </p>
           <p className="text-[11px] text-gray-400 leading-relaxed">
             {currentLanguage === 'TR'
-              ? '🇹🇷 Türk kullanıcılar → TurkPaneli.com API (turkpaneli.com/api/v2)  |  🌍 Yabancı kullanıcılar → ResellerProvider.com API (resellerprovider.com/api/v2)'
-              : '🇹🇷 Turkish users → TurkPaneli.com API (turkpaneli.com/api/v2)  |  🌍 International users → ResellerProvider.com API (resellerprovider.com/api/v2)'}
-          </p>
-          <p className="text-[10px] text-gray-500">
-            {currentLanguage === 'TR'
-              ? 'cPanel\'de api-proxy.php otomatik olarak doğru sağlayıcıya yönlendirir. Her sağlayıcıya kendi API Key\'ini girin.'
-              : 'api-proxy.php on cPanel automatically routes to the correct provider. Enter each provider\'s own API Key.'}
+              ? 'Tüm siparişler TurkPaneli.com API üzerinden iletilir. Her kategoriden en ucuz ve en hızlı servisler otomatik olarak seçilir.'
+              : 'All orders are routed through TurkPaneli.com API. Cheapest and fastest services per category are selected automatically.'}
           </p>
         </div>
       </div>
@@ -241,7 +236,6 @@ export const ApiConfig: React.FC = () => {
                     <div className="flex items-center gap-2.5 flex-wrap">
                       <span className={`w-2.5 h-2.5 rounded-full shadow-md shrink-0 ${provider.status ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                       <h4 className="text-xs font-black text-white">{provider.name}</h4>
-                      {getRegionBadge(provider.region)}
                     </div>
 
                     <p className="text-[11px] text-gray-500 font-medium truncate">
@@ -335,9 +329,8 @@ export const ApiConfig: React.FC = () => {
           <p className="text-emerald-400 font-bold mt-2">// 2. cPanel'e yüklenecek dosyalar:</p>
           <p className="text-gray-300">dist/ klasörü içindeki tüm dosyalar + <span className="text-yellow-400">api-proxy.php</span></p>
           <p className="text-gray-300"><span className="text-yellow-400">.htaccess</span> dosyası public/ klasöründen dist/ root'una kopyalanacak</p>
-          <p className="text-emerald-400 font-bold mt-2">// 3. PHP proxy otomatik yönlendirme:</p>
-          <p className="text-gray-300">🇹🇷 TR Kullanıcı → <span className="text-cyan-400">turkpaneli.com/api/v2</span></p>
-          <p className="text-gray-300">🌍 Global Kullanıcı → <span className="text-blue-400">resellerprovider.com/api/v2</span></p>
+          <p className="text-emerald-400 font-bold mt-2">// 3. PHP proxy yönlendirme:</p>
+          <p className="text-gray-300">Tüm kullanıcılar → <span className="text-cyan-400">turkpaneli.com/api/v2</span></p>
         </div>
       </div>
 
