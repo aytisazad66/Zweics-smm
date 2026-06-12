@@ -48,25 +48,50 @@ import {
 } from 'lucide-react';
 
 // Extract delivery speed from service name (works for already-imported services)
+// Priority: specific rate info first (Saatte X, Günde X), then generic keywords
 function extractSpeedFromName(name: string): string | null {
   const n = name;
-  if (/anlık/i.test(n)) return 'Anlık';
+
+  // Specific rate per hour: "Saatte 10K", "Saatte 5.000"
   const perHour = n.match(/saatte\s+([\d.,]+\s*[Kk]?)/i);
-  if (perHour) return `${perHour[1].trim()}/saat`;
+  if (perHour) {
+    const rate = perHour[1].trim().toUpperCase();
+    return `${rate}/saat`;
+  }
+
+  // Specific rate per day: "Günde 50K", "Günde 10.000"
   const perDay = n.match(/günde\s+([\d.,]+\s*[Kk]?)/i);
-  if (perDay) return `${perDay[1].trim()}/gün`;
+  if (perDay) {
+    const rate = perDay[1].trim().toUpperCase();
+    return `${rate}/gün`;
+  }
+
+  // Specific rate per minute: "Dakikada 500"
   const perMin = n.match(/dakikada\s+([\d.,]+\s*[Kk]?)/i);
-  if (perMin) return `${perMin[1].trim()}/dk`;
+  if (perMin) {
+    const rate = perMin[1].trim().toUpperCase();
+    return `${rate}/dk`;
+  }
+
+  // Specific rate per week: "Haftada 50K"
   const perWeek = n.match(/haftada\s+([\d.,]+\s*[Kk]?)/i);
-  if (perWeek) return `${perWeek[1].trim()}/hafta`;
+  if (perWeek) {
+    const rate = perWeek[1].trim().toUpperCase();
+    return `${rate}/hafta`;
+  }
+
+  // Time estimate: "30 Dakika", "2 Saat", "3 Gün"
   const mins = n.match(/(\d+)\s*dakika/i);
   if (mins) return `~${mins[1]} dk`;
   const hours = n.match(/(\d+)\s*saat/i);
   if (hours) return `~${hours[1]} saat`;
   const days = n.match(/(\d+)\s*gün/i);
   if (days) return `~${days[1]} gün`;
-  if (/instant|express/i.test(n)) return 'Anlık';
+
+  // Generic fast keywords (last resort)
+  if (/anlık|instant|express/i.test(n)) return 'Anlık';
   if (/süper hızlı|hızlı tesli/i.test(n)) return 'Hızlı';
+
   return null;
 }
 
