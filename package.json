@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 5000",
-    "build": "vite build",
-    "preview": "vite preview --port 3000",
-    "lint": "tsc --noEmit"
+    "dev": "node_modules/.bin/vite --host 0.0.0.0 --port 5000",
+    "build": "node_modules/.bin/vite build",
+    "preview": "node_modules/.bin/vite preview --port 3000",
+    "lint": "node_modules/.bin/tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^2.8.0",
