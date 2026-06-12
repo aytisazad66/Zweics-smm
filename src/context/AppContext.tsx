@@ -918,6 +918,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           }
         }
 
+        // Interval: drip-feed delivery interval in minutes
+        let deliveryInterval: string | undefined;
+        const intervalMin = item.interval !== undefined ? parseFloat(String(item.interval)) : NaN;
+        if (!isNaN(intervalMin) && intervalMin > 0) {
+          if (intervalMin < 60) {
+            deliveryInterval = `${Math.round(intervalMin)} dk/adet`;
+          } else if (intervalMin < 1440) {
+            deliveryInterval = `${Math.round(intervalMin / 60)} saat/adet`;
+          } else {
+            deliveryInterval = `${Math.round(intervalMin / 1440)} gün/adet`;
+          }
+        }
+
         const newService: Service = {
           id: `${providerId}_${serviceId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
           name,
@@ -931,7 +944,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           description: `${category}`,
           providerServiceId: Number(serviceId),
           providerApiId: providerId,
-          deliverySpeed
+          deliverySpeed,
+          deliveryInterval
         };
         newServices.push(newService);
         addedCount++;

@@ -12,6 +12,7 @@ export interface Service {
   providerServiceId?: number;
   providerApiId?: string;
   deliverySpeed?: string;
+  deliveryInterval?: string;
 }
 
 export interface Order {

@@ -245,11 +245,16 @@ export const ClientDashboard: React.FC = () => {
   const [catalogPage, setCatalogPage] = useState(1);
 
   const filteredCatalogServices = useMemo(() => {
-    setCatalogPage(1);
     return services
       .filter(s => s.status === 'active')
       .filter(s => selectedServicePlatformFilter === 'All' || s.platform === selectedServicePlatformFilter)
-      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()));
+      .filter(s => s.name.toLowerCase().includes(servicesSearch.toLowerCase()))
+      .sort((a, b) => a.pricePer1000 - b.pricePer1000);
+  }, [services, selectedServicePlatformFilter, servicesSearch]);
+
+  // Reset to page 1 when filters change — must NOT be inside useMemo
+  useEffect(() => {
+    setCatalogPage(1);
   }, [services, selectedServicePlatformFilter, servicesSearch]);
 
   const catalogTotalPages = Math.ceil(filteredCatalogServices.length / CATALOG_PAGE_SIZE);
@@ -1327,11 +1332,16 @@ export const ClientDashboard: React.FC = () => {
                                         <span className="text-[9px] font-bold bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md">{serv.category}</span>
                                       </div>
                                       <p className={`text-xs font-semibold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>{serv.name}</p>
-                                      <div className="flex items-center gap-3 flex-wrap">
+                                      <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-[10px] text-gray-500 font-mono">Min {serv.min} — Max {serv.max}</span>
                                         {serv.deliverySpeed && (
                                           <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
                                             <Timer className="w-2.5 h-2.5" />{serv.deliverySpeed}
+                                          </span>
+                                        )}
+                                        {serv.deliveryInterval && (
+                                          <span className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold">
+                                            <RefreshCw className="w-2 h-2" />{serv.deliveryInterval}
                                           </span>
                                         )}
                                       </div>
@@ -1454,9 +1464,18 @@ export const ClientDashboard: React.FC = () => {
                         {activeServiceObj?.deliverySpeed && (
                           <div>
                             <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'Tahmini Gönderim Süresi' : 'Est. Delivery Time'}</span>
-                            <span className="font-bold text-emerald-400 mt-1 block flex items-center gap-1">
+                            <span className="font-bold text-emerald-400 mt-1 flex items-center gap-1">
                               <Timer className="w-3.5 h-3.5 shrink-0" />
                               {activeServiceObj.deliverySpeed}
+                            </span>
+                          </div>
+                        )}
+                        {activeServiceObj?.deliveryInterval && (
+                          <div>
+                            <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'Gönderim Aralığı' : 'Delivery Interval'}</span>
+                            <span className="font-bold text-amber-400 mt-1 flex items-center gap-1">
+                              <RefreshCw className="w-3.5 h-3.5 shrink-0" />
+                              {activeServiceObj.deliveryInterval}
                             </span>
                           </div>
                         )}
@@ -1556,14 +1575,23 @@ export const ClientDashboard: React.FC = () => {
                             {ser.min} — {ser.max}
                           </td>
                           <td className="py-3 px-3 text-center hidden sm:table-cell">
-                            {ser.deliverySpeed ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/30 px-2 py-0.5 rounded-lg">
-                                <Timer className="w-2.5 h-2.5" />
-                                {ser.deliverySpeed}
-                              </span>
-                            ) : (
-                              <span className="text-[10px] text-gray-600">—</span>
-                            )}
+                            <div className="flex flex-col items-center gap-1">
+                              {ser.deliverySpeed ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/30 px-2 py-0.5 rounded-lg whitespace-nowrap">
+                                  <Timer className="w-2.5 h-2.5 shrink-0" />
+                                  {ser.deliverySpeed}
+                                </span>
+                              ) : null}
+                              {ser.deliveryInterval ? (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-400 bg-amber-950/30 border border-amber-800/20 px-2 py-0.5 rounded-lg whitespace-nowrap">
+                                  <RefreshCw className="w-2 h-2 shrink-0" />
+                                  {ser.deliveryInterval}
+                                </span>
+                              ) : null}
+                              {!ser.deliverySpeed && !ser.deliveryInterval && (
+                                <span className="text-[10px] text-gray-600">—</span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-cyan-400 font-bold text-sm">
                             ₺{ser.pricePer1000.toFixed(2)}
