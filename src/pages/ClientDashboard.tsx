@@ -47,6 +47,33 @@ import {
   ChevronRight
 } from 'lucide-react';
 
+// Extract delivery speed from service name (works for already-imported services)
+function extractSpeedFromName(name: string): string | null {
+  const n = name;
+  if (/anlık/i.test(n)) return 'Anlık';
+  const perHour = n.match(/saatte\s+([\d.,]+\s*[Kk]?)/i);
+  if (perHour) return `${perHour[1].trim()}/saat`;
+  const perDay = n.match(/günde\s+([\d.,]+\s*[Kk]?)/i);
+  if (perDay) return `${perDay[1].trim()}/gün`;
+  const perMin = n.match(/dakikada\s+([\d.,]+\s*[Kk]?)/i);
+  if (perMin) return `${perMin[1].trim()}/dk`;
+  const perWeek = n.match(/haftada\s+([\d.,]+\s*[Kk]?)/i);
+  if (perWeek) return `${perWeek[1].trim()}/hafta`;
+  const mins = n.match(/(\d+)\s*dakika/i);
+  if (mins) return `~${mins[1]} dk`;
+  const hours = n.match(/(\d+)\s*saat/i);
+  if (hours) return `~${hours[1]} saat`;
+  const days = n.match(/(\d+)\s*gün/i);
+  if (days) return `~${days[1]} gün`;
+  if (/instant|express/i.test(n)) return 'Anlık';
+  if (/süper hızlı|hızlı tesli/i.test(n)) return 'Hızlı';
+  return null;
+}
+
+function getServiceSpeed(service: { deliverySpeed?: string; name: string }): string | null {
+  return service.deliverySpeed || extractSpeedFromName(service.name);
+}
+
 export const ClientDashboard: React.FC = () => {
   const { 
     currentClientUser, 
@@ -1259,9 +1286,9 @@ export const ClientDashboard: React.FC = () => {
                             <span className="text-white font-semibold text-xs block truncate">{activeServiceObj.name}</span>
                             <div className="flex items-center gap-3 mt-0.5">
                               <span className="text-cyan-400 font-mono font-bold text-[10px]">₺{activeServiceObj.pricePer1000.toFixed(2)} / 1k</span>
-                              {activeServiceObj.deliverySpeed && (
+                              {getServiceSpeed(activeServiceObj) && (
                                 <span className="text-emerald-400 text-[10px] flex items-center gap-1">
-                                  <Timer className="w-2.5 h-2.5" />{activeServiceObj.deliverySpeed}
+                                  <Timer className="w-2.5 h-2.5" />{getServiceSpeed(activeServiceObj)}
                                 </span>
                               )}
                             </div>
@@ -1334,9 +1361,9 @@ export const ClientDashboard: React.FC = () => {
                                       <p className={`text-xs font-semibold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>{serv.name}</p>
                                       <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-[10px] text-gray-500 font-mono">Min {serv.min} — Max {serv.max}</span>
-                                        {serv.deliverySpeed && (
+                                        {getServiceSpeed(serv) && (
                                           <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
-                                            <Timer className="w-2.5 h-2.5" />{serv.deliverySpeed}
+                                            <Timer className="w-2.5 h-2.5" />{getServiceSpeed(serv)}
                                           </span>
                                         )}
                                         {serv.deliveryInterval && (
