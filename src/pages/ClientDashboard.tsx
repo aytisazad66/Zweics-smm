@@ -41,7 +41,10 @@ import {
   Copy,
   ClipboardCheck,
   BanknoteIcon,
-  Bell
+  Bell,
+  Timer,
+  Tag,
+  ChevronRight
 } from 'lucide-react';
 
 export const ClientDashboard: React.FC = () => {
@@ -126,6 +129,8 @@ export const ClientDashboard: React.FC = () => {
   // New Order Form States
   const [orderPlatform, setOrderPlatform] = useState<string>('Instagram');
   const [selectedServiceId, setSelectedServiceId] = useState<string>('');
+  const [servicePickerOpen, setServicePickerOpen] = useState(false);
+  const [servicePickerSearch, setServicePickerSearch] = useState('');
   const [orderQuantity, setOrderQuantity] = useState<number>(1000);
   const [orderLink, setOrderLink] = useState<string>('');
   const [orderUsername, setOrderUsername] = useState<string>('');
@@ -1230,25 +1235,126 @@ export const ClientDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Complete Service selector nested within selected platform */}
+                  {/* Service Picker */}
                   <div className="space-y-1.5">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Sosyal Ağ Servis Seçimi (API Uyumlu)' : 'Active Wholesale SMM Service'}</label>
-                    <select
-                      id="client-select-service"
-                      className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 px-4 text-white font-semibold focus:outline-none focus:border-cyan-400 transition"
-                      value={selectedServiceId}
-                      onChange={(e) => setSelectedServiceId(e.target.value)}
-                    >
-                      {servicesOfPlatform.length === 0 ? (
-                        <option value="">{currentLanguage === 'TR' ? 'Bu platformda aktif servis yok' : 'No active service available'}</option>
-                      ) : (
-                        servicesOfPlatform.map((serv, idx) => (
-                          <option key={serv.id} value={serv.id}>
-                            #{idx + 1} - {serv.name} (₺{serv.pricePer1000.toFixed(2)} / 1000)
-                          </option>
-                        ))
-                      )}
-                    </select>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Sosyal Ağ Servis Seçimi' : 'Active Wholesale SMM Service'}</label>
+
+                    {servicesOfPlatform.length === 0 ? (
+                      <div className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-3 px-4 text-gray-500 text-xs">
+                        {currentLanguage === 'TR' ? 'Bu platformda aktif servis yok' : 'No active service available'}
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => { setServicePickerOpen(true); setServicePickerSearch(''); }}
+                        className="w-full bg-[#0d0d1c] border border-white/10 hover:border-cyan-400/50 rounded-xl py-3 px-4 text-left transition flex items-center justify-between gap-3 group"
+                      >
+                        {activeServiceObj ? (
+                          <div className="flex-1 min-w-0">
+                            <span className="text-white font-semibold text-xs block truncate">{activeServiceObj.name}</span>
+                            <div className="flex items-center gap-3 mt-0.5">
+                              <span className="text-cyan-400 font-mono font-bold text-[10px]">₺{activeServiceObj.pricePer1000.toFixed(2)} / 1k</span>
+                              {activeServiceObj.deliverySpeed && (
+                                <span className="text-emerald-400 text-[10px] flex items-center gap-1">
+                                  <Timer className="w-2.5 h-2.5" />{activeServiceObj.deliverySpeed}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-gray-500 text-xs">{currentLanguage === 'TR' ? 'Servis seçin...' : 'Select a service...'}</span>
+                        )}
+                        <ChevronDown className="w-4 h-4 text-gray-500 group-hover:text-cyan-400 transition shrink-0" />
+                      </button>
+                    )}
+
+                    {/* Service Picker Modal */}
+                    {servicePickerOpen && (
+                      <div className="fixed inset-0 z-[999] flex items-center justify-center p-4" onClick={() => setServicePickerOpen(false)}>
+                        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+                        <div
+                          className="relative w-full max-w-lg bg-[#0e0e1e] border border-white/10 rounded-3xl shadow-2xl shadow-black/60 flex flex-col max-h-[80vh] animate-fade-in"
+                          onClick={e => e.stopPropagation()}
+                        >
+                          {/* Modal Header */}
+                          <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-white/5">
+                            <div>
+                              <h3 className="text-sm font-bold text-white">{currentLanguage === 'TR' ? 'Servis Seçin' : 'Select Service'}</h3>
+                              <p className="text-[10px] text-gray-500 mt-0.5">{orderPlatform} · {servicesOfPlatform.length} {currentLanguage === 'TR' ? 'aktif servis' : 'active services'}</p>
+                            </div>
+                            <button type="button" onClick={() => setServicePickerOpen(false)} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white transition cursor-pointer">
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          {/* Search */}
+                          <div className="px-5 py-3 border-b border-white/5">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                              <input
+                                autoFocus
+                                type="text"
+                                placeholder={currentLanguage === 'TR' ? 'Servis ara...' : 'Search services...'}
+                                className="w-full bg-[#1a1a2e] border border-white/10 rounded-xl py-2.5 pl-9 pr-4 text-xs text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400 transition"
+                                value={servicePickerSearch}
+                                onChange={e => setServicePickerSearch(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Service Cards List */}
+                          <div className="overflow-y-auto flex-1 p-3 space-y-2">
+                            {servicesOfPlatform
+                              .filter(s => s.name.toLowerCase().includes(servicePickerSearch.toLowerCase()) || s.category.toLowerCase().includes(servicePickerSearch.toLowerCase()))
+                              .map((serv, idx) => {
+                                const isSelected = serv.id === selectedServiceId;
+                                return (
+                                  <button
+                                    key={serv.id}
+                                    type="button"
+                                    onClick={() => { setSelectedServiceId(serv.id); setServicePickerOpen(false); }}
+                                    className={`w-full text-left p-3.5 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
+                                      isSelected
+                                        ? 'bg-cyan-950/40 border-cyan-400/50 shadow-sm shadow-cyan-400/10'
+                                        : 'bg-white/2 border-white/5 hover:bg-white/5 hover:border-white/10'
+                                    }`}
+                                  >
+                                    <div className="flex-1 min-w-0 space-y-1.5">
+                                      <div className="flex items-center gap-2 flex-wrap">
+                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-cyan-400/20 text-cyan-300' : 'bg-white/5 text-gray-500'}`}>
+                                          #{idx + 1}
+                                        </span>
+                                        <span className="text-[9px] font-bold bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md">{serv.category}</span>
+                                      </div>
+                                      <p className={`text-xs font-semibold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>{serv.name}</p>
+                                      <div className="flex items-center gap-3 flex-wrap">
+                                        <span className="text-[10px] text-gray-500 font-mono">Min {serv.min} — Max {serv.max}</span>
+                                        {serv.deliverySpeed && (
+                                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                                            <Timer className="w-2.5 h-2.5" />{serv.deliverySpeed}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <div className="text-right shrink-0">
+                                      <span className="text-sm font-extrabold font-mono text-cyan-400 block">₺{serv.pricePer1000.toFixed(2)}</span>
+                                      <span className="text-[9px] text-gray-600">/ 1000</span>
+                                      {isSelected && (
+                                        <div className="mt-1.5 w-5 h-5 rounded-full bg-cyan-400 flex items-center justify-center ml-auto">
+                                          <CheckCircle className="w-3 h-3 text-black" />
+                                        </div>
+                                      )}
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            {servicesOfPlatform.filter(s => s.name.toLowerCase().includes(servicePickerSearch.toLowerCase()) || s.category.toLowerCase().includes(servicePickerSearch.toLowerCase())).length === 0 && (
+                              <p className="text-center text-gray-600 text-xs py-8">{currentLanguage === 'TR' ? 'Sonuç bulunamadı.' : 'No results found.'}</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Smart input fields based on service type */}
@@ -1345,6 +1451,15 @@ export const ClientDashboard: React.FC = () => {
                             <span>{currentLanguage === 'TR' ? 'Otomatik SMM Sistemi' : 'Automated SMM System'}</span>
                           </span>
                         </div>
+                        {activeServiceObj?.deliverySpeed && (
+                          <div>
+                            <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'Tahmini Gönderim Süresi' : 'Est. Delivery Time'}</span>
+                            <span className="font-bold text-emerald-400 mt-1 block flex items-center gap-1">
+                              <Timer className="w-3.5 h-3.5 shrink-0" />
+                              {activeServiceObj.deliverySpeed}
+                            </span>
+                          </div>
+                        )}
                         <div>
                           <span className="text-gray-500 block leading-none">{currentLanguage === 'TR' ? 'Garanti' : 'Guaranty Status'}</span>
                           <span className="font-bold text-emerald-400 mt-1 block">✓ 30 Gün Telafi Garantili</span>
@@ -1423,21 +1538,32 @@ export const ClientDashboard: React.FC = () => {
                     <tr className="bg-white/2 border-b border-white/5 text-gray-500 font-bold uppercase tracking-wider text-[9px]">
                       <th className="py-3 px-3">#</th>
                       <th className="py-3 px-3">{currentLanguage === 'TR' ? 'Hizmet Detayları' : 'Specific Package Detail'}</th>
-                      <th className="py-3 px-3">{currentLanguage === 'TR' ? 'Min / Max Limit' : 'Min / Max Scope'}</th>
+                      <th className="py-3 px-3">{currentLanguage === 'TR' ? 'Min / Max' : 'Min / Max'}</th>
+                      <th className="py-3 px-3 text-center hidden sm:table-cell">{currentLanguage === 'TR' ? 'Gönderim Süresi' : 'Est. Speed'}</th>
                       <th className="py-3 px-3 text-right">{currentLanguage === 'TR' ? 'Birim Fiyat' : 'Price /1k'}</th>
-                      <th className="py-3 px-3 text-center">{currentLanguage === 'TR' ? 'Hızlı Sipariş' : 'Buy Now'}</th>
+                      <th className="py-3 px-3 text-center">{currentLanguage === 'TR' ? 'Sipariş' : 'Order'}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-gray-300 font-medium leading-relaxed">
                     {paginatedCatalogServices.map((ser, idx) => (
-                        <tr key={ser.id} className="hover:bg-white/1 transition-colors">
-                          <td className="py-3 px-3 font-mono text-cyan-400 font-bold">#{idx + 1}</td>
+                        <tr key={ser.id} className="hover:bg-white/2 transition-colors group">
+                          <td className="py-3 px-3 font-mono text-cyan-400 font-bold text-[10px]">#{(catalogPage - 1) * CATALOG_PAGE_SIZE + idx + 1}</td>
                           <td className="py-3 px-3">
-                            <span className="text-white font-bold block">{ser.name}</span>
-                            <span className="text-[10px] text-gray-500 mt-0.5 block line-clamp-1">{ser.description}</span>
+                            <span className="text-white font-semibold block text-[11px] leading-snug">{ser.name}</span>
+                            <span className="text-[9px] font-bold text-purple-400/80 mt-0.5 block">{ser.category}</span>
                           </td>
-                          <td className="py-3 px-3 font-mono text-gray-400 text-[10.5px]">
-                            {ser.min} - {ser.max}
+                          <td className="py-3 px-3 font-mono text-gray-500 text-[10px]">
+                            {ser.min} — {ser.max}
+                          </td>
+                          <td className="py-3 px-3 text-center hidden sm:table-cell">
+                            {ser.deliverySpeed ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/30 px-2 py-0.5 rounded-lg">
+                                <Timer className="w-2.5 h-2.5" />
+                                {ser.deliverySpeed}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-gray-600">—</span>
+                            )}
                           </td>
                           <td className="py-3 px-3 text-right font-mono text-cyan-400 font-bold text-sm">
                             ₺{ser.pricePer1000.toFixed(2)}
@@ -1445,9 +1571,9 @@ export const ClientDashboard: React.FC = () => {
                           <td className="py-3 px-3 text-center">
                             <button
                               onClick={() => triggerSpeedOrder(ser.id)}
-                              className="px-2.5 py-1 text-[9.5px] font-black bg-cyan-950/40 text-cyan-400 border border-cyan-400/20 rounded-xl hover:bg-cyan-500 hover:text-black hover:border-transparent transition"
+                              className="px-3 py-1.5 text-[9.5px] font-black bg-cyan-950/40 text-cyan-400 border border-cyan-400/20 rounded-xl hover:bg-cyan-500 hover:text-black hover:border-transparent transition group-hover:border-cyan-400/40"
                             >
-                              {currentLanguage === 'TR' ? 'Sipariş Gir' : 'Select'}
+                              {currentLanguage === 'TR' ? 'Sipariş Ver' : 'Order'}
                             </button>
                           </td>
                         </tr>

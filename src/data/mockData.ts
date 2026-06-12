@@ -11,6 +11,7 @@ export interface Service {
   description: string;
   providerServiceId?: number;
   providerApiId?: string;
+  deliverySpeed?: string;
 }
 
 export interface Order {

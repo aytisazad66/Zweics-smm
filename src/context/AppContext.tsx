@@ -905,6 +905,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const markup = 1.3;
         const pricePer1000 = parseFloat((rate * markup).toFixed(2));
 
+        // Delivery speed: average_time (minutes) → human readable
+        let deliverySpeed: string | undefined;
+        const avgTime = item.average_time !== undefined ? parseFloat(String(item.average_time)) : NaN;
+        if (!isNaN(avgTime) && avgTime > 0) {
+          if (avgTime < 60) {
+            deliverySpeed = `~${Math.round(avgTime)} dk`;
+          } else if (avgTime < 1440) {
+            deliverySpeed = `~${Math.round(avgTime / 60)} saat`;
+          } else {
+            deliverySpeed = `~${Math.round(avgTime / 1440)} gün`;
+          }
+        }
+
         const newService: Service = {
           id: `${providerId}_${serviceId}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
           name,
@@ -917,7 +930,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           sortOrder: services.length + newServices.length + 1,
           description: `${category}`,
           providerServiceId: Number(serviceId),
-          providerApiId: providerId
+          providerApiId: providerId,
+          deliverySpeed
         };
         newServices.push(newService);
         addedCount++;
