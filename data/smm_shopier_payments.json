@@ -20,5 +20,49 @@
     "status": "pending",
     "createdAt": "2026-06-13T23:09:32.514Z",
     "processedAt": null
+  },
+  "SP1781392387042I87H0I": {
+    "shopierProductId": "48029082",
+    "shopierProductUrl": "https://www.shopier.com/48029082",
+    "userId": "105",
+    "userName": "salih",
+    "userEmail": "volkanbor13@gmail.com",
+    "amount": 150,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:13:07.548Z",
+    "processedAt": null
+  },
+  "SP1781392427863BI3EWA": {
+    "shopierProductId": "48029091",
+    "shopierProductUrl": "https://www.shopier.com/48029091",
+    "userId": "105",
+    "userName": "salih",
+    "userEmail": "volkanbor13@gmail.com",
+    "amount": 5000,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:13:48.354Z",
+    "processedAt": null
+  },
+  "SP17813925876089P4VUV": {
+    "shopierProductId": "48029197",
+    "shopierProductUrl": "https://www.shopier.com/48029197",
+    "userId": "105",
+    "userName": "salih",
+    "userEmail": "volkanbor13@gmail.com",
+    "amount": 151,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:16:28.092Z",
+    "processedAt": null
+  },
+  "SP1781393096805N9EN5U": {
+    "shopierProductId": "48029322",
+    "shopierProductUrl": "https://www.shopier.com/48029322",
+    "userId": "volkanbor@gmail.com",
+    "userName": "volkanbor",
+    "userEmail": "volkanbor@gmail.com",
+    "amount": 75,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:24:57.328Z",
+    "processedAt": null
   }
 }

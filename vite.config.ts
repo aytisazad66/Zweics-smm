@@ -258,12 +258,13 @@ function shopierPlugin(): Plugin {
     return 'SP' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();
   }
 
-  async function shopierCreateProduct(apiKey: string, title: string, price: number, imageUrl: string): Promise<{ id: string; url: string } | null> {
+  async function shopierCreateProduct(apiKey: string, title: string, price: number, imageUrl: string, userName: string): Promise<{ id: string; url: string } | null> {
     const resp = await fetch('https://api.shopier.com/v1/products', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
       body: JSON.stringify({
         title,
+        description: `Bakiyesi (${userName})`,
         type: 'digital',
         media: [{ url: imageUrl, type: 'image', placement: 1 }],
         priceData: { price, currency: 'TRY' },
@@ -328,8 +329,8 @@ function shopierPlugin(): Plugin {
               return;
             }
             const ref = generateRef();
-            const title = `Bakiye Yüklemesi - ${numAmount.toFixed(2)} TL - ${userId}`;
-            const product = await shopierCreateProduct(cfg.apiKey, title, numAmount, cfg.productImageUrl || 'https://www.gstatic.com/webp/gallery/1.jpg');
+            const title = `Bakiye Yüklemesi - ${numAmount.toFixed(2)} TL`;
+            const product = await shopierCreateProduct(cfg.apiKey, title, numAmount, cfg.productImageUrl || 'https://cdn.pixabay.com/photo/2020/05/18/16/17/social-media-5187243_1280.png', userName);
             if (!product) {
               res.writeHead(502);
               res.end(JSON.stringify({ ok: false, message: 'Shopier ürün oluşturulamadı. Lütfen tekrar deneyin.' }));
