@@ -251,7 +251,15 @@ function shopierPlugin(): Plugin {
 
   function writeUsers(users: any[]) {
     const f = path.join(DATA_DIR, 'smm_users.json');
-    fs.writeFileSync(f, JSON.stringify(users, null, 2), 'utf-8');
+    // Preserve original file format ({value: "..."} wrapper vs plain array)
+    let raw: any;
+    try { raw = JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { raw = null; }
+    if (raw && !Array.isArray(raw) && raw.value !== undefined) {
+      raw.value = JSON.stringify(users);
+      fs.writeFileSync(f, JSON.stringify(raw, null, 2), 'utf-8');
+    } else {
+      fs.writeFileSync(f, JSON.stringify(users, null, 2), 'utf-8');
+    }
   }
 
   function generateRef(): string {
@@ -278,15 +286,19 @@ function shopierPlugin(): Plugin {
   }
 
   async function shopierCheckOrders(apiKey: string, productId: string): Promise<boolean> {
-    // Try orders endpoint with product filter
+    // Primary: orders endpoint filtered by product_id
+    // Real Shopier order statuses: status="unfulfilled", paymentStatus="paid"
     try {
       const r = await fetch(`https://api.shopier.com/v1/orders?product_id=${productId}&limit=10`, {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
       });
       if (r.ok) {
         const data = await r.json() as any;
-        const list = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
-        if (list.some((o: any) => o.status === 'paid' || o.status === 'completed' || o.paymentStatus === 'paid')) return true;
+        const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
+        if (list.some((o: any) =>
+          o.paymentStatus === 'paid' || o.paymentStatus === 'completed' ||
+          o.status === 'paid' || o.status === 'completed' || o.status === 'fulfilled'
+        )) return true;
       }
     } catch {}
     // Fallback: check product stock (stockQuantity drops to 0 after purchase)
@@ -296,7 +308,7 @@ function shopierPlugin(): Plugin {
       });
       if (r.ok) {
         const prod = await r.json() as any;
-        if (prod.stockQuantity === 0 || prod.stockStatus === 'outOfStock') return true;
+        if ((prod.stockQuantity ?? 1) === 0) return true;
       }
     } catch {}
     return false;

@@ -191,6 +191,9 @@ export const ClientDashboard: React.FC = () => {
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>(paymentMethods[0]?.id || '1');
   const [depositAmount, setDepositAmount] = useState<string>('150');
   const [shopierLoading, setShopierLoading] = useState(false);
+  const [shopierCheckLoading, setShopierCheckLoading] = useState(false);
+  const [shopierPendingRef] = useState(() => localStorage.getItem('shopier_pending_ref') || '');
+  const [shopierBannerDismissed, setShopierBannerDismissed] = useState(false);
   const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string; methodId: string; confirmed: boolean } | null>(null);
   const [copiedInstructions, setCopiedInstructions] = useState(false);
 
@@ -465,6 +468,30 @@ export const ClientDashboard: React.FC = () => {
       setActiveTab('my-orders');
       setExpandedOrderId(newOrderId);
     }
+  };
+
+  const handleShopierManualCheck = async () => {
+    const ref = shopierPendingRef;
+    if (!ref) return;
+    setShopierCheckLoading(true);
+    try {
+      const resp = await fetch(`/api/shopier/check-payment?ref=${encodeURIComponent(ref)}`);
+      const data = await resp.json();
+      if (data.status === 'completed' || data.status === 'already_processed') {
+        localStorage.removeItem('shopier_pending_ref');
+        localStorage.removeItem('shopier_pending_amount');
+        showToast(`✅ Ödeme doğrulandı! ₺${data.amount?.toFixed(2)} bakiyenize eklendi.`, 'success');
+        // Trigger server sync to refresh balance
+        setTimeout(() => window.location.reload(), 1500);
+      } else if (data.status === 'pending') {
+        showToast(currentLanguage === 'TR' ? 'Ödeme henüz Shopier tarafından onaylanmadı. Birkaç saniye sonra tekrar deneyin.' : 'Payment not confirmed yet. Try again in a few seconds.', 'error');
+      } else {
+        showToast(data.message || 'Ödeme bulunamadı.', 'error');
+      }
+    } catch {
+      showToast(currentLanguage === 'TR' ? 'Bağlantı hatası.' : 'Connection error.', 'error');
+    }
+    setShopierCheckLoading(false);
   };
 
   const handleShopierPay = async () => {
