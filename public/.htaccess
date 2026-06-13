@@ -7,6 +7,7 @@ RewriteRule ^api-proxy\.php$ - [L]
 RewriteRule ^api-kv\.php$ - [L]
 RewriteRule ^api-mail\.php$ - [L]
 RewriteRule ^api-auth\.php$ - [L]
+RewriteRule ^api-shopier\.php$ - [L]
 
 # /api/kv/{key} isteklerini PHP KV store'a yönlendir
 RewriteRule ^api/kv/([a-zA-Z0-9_]+)$ api-kv.php?key=$1 [L,QSA]
@@ -17,6 +18,11 @@ RewriteRule ^api/mail$ api-mail.php [L,QSA]
 # /api/auth/* isteklerini PHP auth'a yönlendir
 RewriteRule ^api/auth/login$ api-auth.php?action=login [L,QSA]
 RewriteRule ^api/auth/set-credentials$ api-auth.php?action=set-credentials [L,QSA]
+
+# /api/shopier/* isteklerini PHP Shopier handler'a yönlendir
+RewriteRule ^api/shopier/create-product$ api-shopier.php/create-product [L,QSA]
+RewriteRule ^api/shopier/check-payment$ api-shopier.php/check-payment [L,QSA]
+RewriteRule ^api/shopier/webhook$ api-shopier.php/webhook [L,QSA]
 
 # SPA fallback — tüm diğer route'ları React'a gönder
 RewriteRule ^index\.html$ - [L]

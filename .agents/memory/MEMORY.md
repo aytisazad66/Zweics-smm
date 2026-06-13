@@ -6,3 +6,4 @@
 - [Services pagination](services-pagination.md) — 20 services per page; pagedServices derived from filteredServices; page resets on platform change; index_in_filtered used for arrow buttons
 - [Logo component](logo-component.md) — BorMediaLogo at src/components/BorMediaLogo.tsx; SVG circle with gradient + text; size prop: sm/md/lg
 - [cPanel build](cpanel-build.md) — bormedya-cpanel.zip and bormedya-cpanel.tar.gz in project root; vite build copies PHP/htaccess files from public/
+- [Shopier integration](shopier-integration.md) — Shopier REST API for instant card payments; ref stored in localStorage before redirect; success page polls /api/shopier/check-payment

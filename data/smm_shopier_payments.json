@@ -1,0 +1,24 @@
+{
+  "SP1781392006875L3PYR6": {
+    "shopierProductId": "48029026",
+    "shopierProductUrl": "https://www.shopier.com/48029026",
+    "userId": "test@example.com",
+    "userName": "Test Kullanıcı",
+    "userEmail": "test@example.com",
+    "amount": 50,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:06:47.452Z",
+    "processedAt": null
+  },
+  "SP1781392171933TQ8ANS": {
+    "shopierProductId": "48029050",
+    "shopierProductUrl": "https://www.shopier.com/48029050",
+    "userId": "volkanbor@gmail.com",
+    "userName": "Volkan Bor",
+    "userEmail": "volkanbor@gmail.com",
+    "amount": 100,
+    "status": "pending",
+    "createdAt": "2026-06-13T23:09:32.514Z",
+    "processedAt": null
+  }
+}

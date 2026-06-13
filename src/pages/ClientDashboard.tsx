@@ -190,6 +190,7 @@ export const ClientDashboard: React.FC = () => {
   // Add Funds States
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>(paymentMethods[0]?.id || '1');
   const [depositAmount, setDepositAmount] = useState<string>('150');
+  const [shopierLoading, setShopierLoading] = useState(false);
   const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string; methodId: string; confirmed: boolean } | null>(null);
   const [copiedInstructions, setCopiedInstructions] = useState(false);
 
@@ -463,6 +464,40 @@ export const ClientDashboard: React.FC = () => {
       setOrderUsername('');
       setActiveTab('my-orders');
       setExpandedOrderId(newOrderId);
+    }
+  };
+
+  const handleShopierPay = async () => {
+    const val = parseFloat(depositAmount);
+    if (isNaN(val) || val < 10 || val > 5000) {
+      showToast(currentLanguage === 'TR' ? 'Tutar 10 TL ile 5.000 TL arasında olmalıdır.' : 'Amount must be between 10 and 5000 TRY.', 'error');
+      return;
+    }
+    setShopierLoading(true);
+    try {
+      const resp = await fetch('/api/shopier/create-product', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: val,
+          userId: currentClientUser?.id || currentClientUser?.email || '',
+          userName: currentClientUser?.fullName || '',
+          userEmail: currentClientUser?.email || '',
+        }),
+      });
+      const data = await resp.json();
+      if (data.ok && data.url) {
+        // Store ref in localStorage so success page can retrieve it after redirect
+        localStorage.setItem('shopier_pending_ref', data.ref);
+        localStorage.setItem('shopier_pending_amount', String(val));
+        window.location.href = data.url;
+      } else {
+        showToast(data.message || (currentLanguage === 'TR' ? 'Shopier bağlantısı kurulamadı.' : 'Could not connect to Shopier.'), 'error');
+        setShopierLoading(false);
+      }
+    } catch {
+      showToast(currentLanguage === 'TR' ? 'Bağlantı hatası. Lütfen tekrar deneyin.' : 'Connection error. Please try again.', 'error');
+      setShopierLoading(false);
     }
   };
 
@@ -1928,6 +1963,43 @@ export const ClientDashboard: React.FC = () => {
                   </button>
 
                 </form>
+
+                {/* Shopier instant payment separator */}
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-white/5" />
+                  <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">veya anlık öde</span>
+                  <div className="flex-1 h-px bg-white/5" />
+                </div>
+
+                {/* Shopier instant pay button */}
+                <button
+                  type="button"
+                  onClick={handleShopierPay}
+                  disabled={shopierLoading}
+                  className="w-full py-3.5 bg-[#FF6000] hover:bg-[#e55500] disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold rounded-xl shadow-lg hover:shadow-orange-500/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  {shopierLoading ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                      <span>{currentLanguage === 'TR' ? 'Shopier\'e Yönlendiriliyor...' : 'Redirecting to Shopier...'}</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                      </svg>
+                      <span>{currentLanguage === 'TR' ? 'Shopier ile Kredi Kartıyla Öde' : 'Pay Instantly with Shopier'}</span>
+                    </>
+                  )}
+                </button>
+                <p className="text-[10px] text-gray-600 text-center">
+                  {currentLanguage === 'TR'
+                    ? '🔒 Shopier güvenli ödeme altyapısı • Kredi/Banka Kartı • Anlık bakiye yükleme'
+                    : '🔒 Secure Shopier payment • Credit/Debit Card • Instant balance top-up'}
+                </p>
               </div>
 
               {/* Deposit transactions logger */}

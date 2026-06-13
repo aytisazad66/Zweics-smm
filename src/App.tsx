@@ -19,6 +19,8 @@ import { ApiConfig } from './pages/ApiConfig';
 import { Tickets } from './pages/Tickets';
 import { Analytics } from './pages/Analytics';
 import { Settings } from './pages/Settings';
+import { ShopierSuccess } from './pages/ShopierSuccess';
+import { ShopierFail } from './pages/ShopierFail';
 
 const AppContent: React.FC = () => {
   const { 
@@ -111,6 +113,11 @@ const AppContent: React.FC = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [setPortalMode]);
   // ─────────────────────────────────────────────────────────────────────────
+
+  // Shopier redirect URL detection — must run before anything else
+  const shopierPath = window.location.pathname;
+  if (shopierPath === '/odeme-basarili') return <ShopierSuccess />;
+  if (shopierPath === '/odeme-basarisiz') return <ShopierFail />;
 
   if (!isServerSynced) {
     return (

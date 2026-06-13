@@ -218,11 +218,244 @@ function kvStorePlugin(): Plugin {
   };
 }
 
+function shopierPlugin(): Plugin {
+  const DATA_DIR = path.resolve('./data');
+
+  function readShopierConfig(): { apiKey: string; enabled: boolean; productImageUrl: string } | null {
+    const f = path.join(DATA_DIR, 'smm_shopier_config.json');
+    if (!fs.existsSync(f)) return null;
+    try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return null; }
+  }
+
+  function readPayments(): Record<string, any> {
+    const f = path.join(DATA_DIR, 'smm_shopier_payments.json');
+    if (!fs.existsSync(f)) return {};
+    try { return JSON.parse(fs.readFileSync(f, 'utf-8')); } catch { return {}; }
+  }
+
+  function writePayments(data: Record<string, any>) {
+    const f = path.join(DATA_DIR, 'smm_shopier_payments.json');
+    fs.writeFileSync(f, JSON.stringify(data, null, 2), 'utf-8');
+  }
+
+  function readUsers(): any[] {
+    const f = path.join(DATA_DIR, 'smm_users.json');
+    if (!fs.existsSync(f)) return [];
+    try {
+      const raw = JSON.parse(fs.readFileSync(f, 'utf-8'));
+      if (Array.isArray(raw)) return raw;
+      if (raw.value) return JSON.parse(raw.value);
+      return [];
+    } catch { return []; }
+  }
+
+  function writeUsers(users: any[]) {
+    const f = path.join(DATA_DIR, 'smm_users.json');
+    fs.writeFileSync(f, JSON.stringify(users, null, 2), 'utf-8');
+  }
+
+  function generateRef(): string {
+    return 'SP' + Date.now() + Math.random().toString(36).substr(2, 6).toUpperCase();
+  }
+
+  async function shopierCreateProduct(apiKey: string, title: string, price: number, imageUrl: string): Promise<{ id: string; url: string } | null> {
+    const resp = await fetch('https://api.shopier.com/v1/products', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({
+        title,
+        type: 'digital',
+        media: [{ url: imageUrl, type: 'image', placement: 1 }],
+        priceData: { price, currency: 'TRY' },
+        shippingPayer: 'sellerPays',
+        stockQuantity: 1,
+      }),
+    });
+    if (!resp.ok) { const t = await resp.text(); console.error('[Shopier] create failed:', t); return null; }
+    const data = await resp.json() as { id: string; url: string };
+    return { id: String(data.id), url: data.url };
+  }
+
+  async function shopierCheckOrders(apiKey: string, productId: string): Promise<boolean> {
+    // Try orders endpoint with product filter
+    try {
+      const r = await fetch(`https://api.shopier.com/v1/orders?product_id=${productId}&limit=10`, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
+      });
+      if (r.ok) {
+        const data = await r.json() as any;
+        const list = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
+        if (list.some((o: any) => o.status === 'paid' || o.status === 'completed' || o.paymentStatus === 'paid')) return true;
+      }
+    } catch {}
+    // Fallback: check product stock (stockQuantity drops to 0 after purchase)
+    try {
+      const r = await fetch(`https://api.shopier.com/v1/products/${productId}`, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
+      });
+      if (r.ok) {
+        const prod = await r.json() as any;
+        if (prod.stockQuantity === 0 || prod.stockStatus === 'outOfStock') return true;
+      }
+    } catch {}
+    return false;
+  }
+
+  return {
+    name: 'shopier-payment',
+    configureServer(server) {
+      // ── POST /api/shopier/create-product ────────────────────────────────────
+      server.middlewares.use('/api/shopier/create-product', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'POST') { next(); return; }
+        let body = '';
+        req.on('data', (c: Buffer) => { body += c.toString(); });
+        req.on('end', async () => {
+          try {
+            const cfg = readShopierConfig();
+            if (!cfg?.enabled || !cfg?.apiKey) {
+              res.writeHead(503);
+              res.end(JSON.stringify({ ok: false, message: 'Shopier entegrasyonu aktif değil.' }));
+              return;
+            }
+            const { amount, userId, userName, userEmail } = JSON.parse(body);
+            const numAmount = parseFloat(amount);
+            if (isNaN(numAmount) || numAmount < 10 || numAmount > 5000) {
+              res.writeHead(400);
+              res.end(JSON.stringify({ ok: false, message: 'Tutar 10 TL ile 5.000 TL arasında olmalıdır.' }));
+              return;
+            }
+            const ref = generateRef();
+            const title = `Bakiye Yüklemesi - ${numAmount.toFixed(2)} TL - ${userId}`;
+            const product = await shopierCreateProduct(cfg.apiKey, title, numAmount, cfg.productImageUrl || 'https://www.gstatic.com/webp/gallery/1.jpg');
+            if (!product) {
+              res.writeHead(502);
+              res.end(JSON.stringify({ ok: false, message: 'Shopier ürün oluşturulamadı. Lütfen tekrar deneyin.' }));
+              return;
+            }
+            const payments = readPayments();
+            payments[ref] = {
+              shopierProductId: product.id,
+              shopierProductUrl: product.url,
+              userId, userName, userEmail,
+              amount: numAmount,
+              status: 'pending',
+              createdAt: new Date().toISOString(),
+              processedAt: null,
+            };
+            writePayments(payments);
+            console.log(`[Shopier] Created product ${product.id} for ${userId} | ₺${numAmount} | ref=${ref}`);
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true, url: product.url, ref }));
+          } catch (err: any) {
+            console.error('[Shopier] create-product error:', err.message);
+            res.writeHead(500);
+            res.end(JSON.stringify({ ok: false, message: err.message }));
+          }
+        });
+      });
+
+      // ── GET /api/shopier/check-payment?ref=XXX ──────────────────────────────
+      server.middlewares.use('/api/shopier/check-payment', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'GET') { next(); return; }
+        const urlObj = new URL(req.url || '/', 'http://localhost');
+        const ref = urlObj.searchParams.get('ref') || '';
+        if (!ref) { res.writeHead(400); res.end(JSON.stringify({ ok: false, message: 'ref gerekli' })); return; }
+        (async () => {
+          try {
+            const cfg = readShopierConfig();
+            if (!cfg?.apiKey) { res.writeHead(503); res.end(JSON.stringify({ ok: false, message: 'Shopier yapılandırılmamış' })); return; }
+            const payments = readPayments();
+            const payment = payments[ref];
+            if (!payment) { res.writeHead(404); res.end(JSON.stringify({ ok: false, status: 'not_found', message: 'Ödeme kaydı bulunamadı.' })); return; }
+            if (payment.status === 'completed') {
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'already_processed', amount: payment.amount }));
+              return;
+            }
+            const paid = await shopierCheckOrders(cfg.apiKey, payment.shopierProductId);
+            if (paid) {
+              // Add balance to user
+              const users = readUsers();
+              const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
+              if (userIdx >= 0) {
+                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + payment.amount).toFixed(2));
+                writeUsers(users);
+              }
+              // Mark payment as completed
+              payments[ref].status = 'completed';
+              payments[ref].processedAt = new Date().toISOString();
+              writePayments(payments);
+              console.log(`[Shopier] Payment ${ref} confirmed. ₺${payment.amount} added to ${payment.userId}`);
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'completed', amount: payment.amount }));
+            } else {
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.amount }));
+            }
+          } catch (err: any) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ ok: false, status: 'error', message: err.message }));
+          }
+        })();
+      });
+
+      // ── POST /api/shopier/webhook ────────────────────────────────────────────
+      server.middlewares.use('/api/shopier/webhook', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        if (req.method !== 'POST') { next(); return; }
+        let body = '';
+        req.on('data', (c: Buffer) => { body += c.toString(); });
+        req.on('end', async () => {
+          try {
+            const payload = JSON.parse(body);
+            console.log('[Shopier] Webhook received:', JSON.stringify(payload).substring(0, 300));
+            const cfg = readShopierConfig();
+            if (!cfg?.apiKey) { res.writeHead(200); res.end('ok'); return; }
+            // Try to find product_id in webhook payload
+            const productId = String(payload.product_id || payload.productId || payload.item_id || '');
+            if (!productId) { res.writeHead(200); res.end('ok'); return; }
+            const payments = readPayments();
+            const ref = Object.keys(payments).find(k => payments[k].shopierProductId === productId);
+            if (!ref) { res.writeHead(200); res.end('ok'); return; }
+            const payment = payments[ref];
+            if (payment.status === 'completed') { res.writeHead(200); res.end('ok'); return; }
+            const paid = await shopierCheckOrders(cfg.apiKey, productId);
+            if (paid) {
+              const users = readUsers();
+              const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
+              if (userIdx >= 0) {
+                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + payment.amount).toFixed(2));
+                writeUsers(users);
+              }
+              payments[ref].status = 'completed';
+              payments[ref].processedAt = new Date().toISOString();
+              writePayments(payments);
+              console.log(`[Shopier] Webhook: payment ${ref} processed. ₺${payment.amount} → ${payment.userId}`);
+            }
+            res.writeHead(200);
+            res.end('ok');
+          } catch (err: any) {
+            console.error('[Shopier] Webhook error:', err.message);
+            res.writeHead(200);
+            res.end('ok');
+          }
+        });
+      });
+    },
+  };
+}
+
 function copyFilesAfterBuild(): Plugin {
   return {
     name: 'copy-cpanel-files',
     closeBundle() {
-      const files = ['public/.htaccess', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php'];
+      const files = ['public/.htaccess', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php'];
       for (const src of files) {
         const dest = `dist/${path.basename(src)}`;
         if (fs.existsSync(src)) {
@@ -237,7 +470,7 @@ function copyFilesAfterBuild(): Plugin {
 export default defineConfig(() => {
   return {
     base: '/',
-    plugins: [react(), tailwindcss(), smmProxyPlugin(), kvStorePlugin(), copyFilesAfterBuild()],
+    plugins: [react(), tailwindcss(), smmProxyPlugin(), shopierPlugin(), kvStorePlugin(), copyFilesAfterBuild()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
