@@ -427,18 +427,34 @@ function shopierPlugin(): Plugin {
         req.on('end', async () => {
           try {
             const payload = JSON.parse(body);
-            console.log('[Shopier] Webhook received:', JSON.stringify(payload).substring(0, 300));
+            console.log('[Shopier] Webhook received:', JSON.stringify(payload).substring(0, 400));
             const cfg = readShopierConfig();
             if (!cfg?.apiKey) { res.writeHead(200); res.end('ok'); return; }
-            // Try to find product_id in webhook payload
-            const productId = String(payload.product_id || payload.productId || payload.item_id || '');
+
+            // Parse product ID from Shopier order.created event format
+            // Payload: { event: "order.created", data: { lineItems: [{ productId, ... }], paymentStatus, ... } }
+            const orderData = payload.data ?? payload;
+            const lineItems: any[] = orderData.lineItems ?? orderData.line_items ?? [];
+            let productId = lineItems.length > 0
+              ? String(lineItems[0].productId ?? lineItems[0].product_id ?? '')
+              : String(payload.product_id ?? payload.productId ?? payload.item_id ?? '');
+
             if (!productId) { res.writeHead(200); res.end('ok'); return; }
+
             const payments = readPayments();
             const ref = Object.keys(payments).find(k => payments[k].shopierProductId === productId);
-            if (!ref) { res.writeHead(200); res.end('ok'); return; }
+            if (!ref) {
+              console.log(`[Shopier] Webhook: no pending payment for product ${productId}`);
+              res.writeHead(200); res.end('ok'); return;
+            }
             const payment = payments[ref];
             if (payment.status === 'completed') { res.writeHead(200); res.end('ok'); return; }
-            const paid = await shopierCheckOrders(cfg.apiKey, productId);
+
+            // Check payment status: either trust webhook paymentStatus or verify via API
+            const webhookPaid = orderData.paymentStatus === 'paid' || orderData.paymentStatus === 'completed'
+              || orderData.status === 'paid' || orderData.status === 'fulfilled';
+            const paid = webhookPaid || await shopierCheckOrders(cfg.apiKey, productId);
+
             if (paid) {
               const users = readUsers();
               const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
@@ -449,7 +465,7 @@ function shopierPlugin(): Plugin {
               payments[ref].status = 'completed';
               payments[ref].processedAt = new Date().toISOString();
               writePayments(payments);
-              console.log(`[Shopier] Webhook: payment ${ref} processed. ₺${payment.amount} → ${payment.userId}`);
+              console.log(`[Shopier] Webhook: ₺${payment.amount} credited to ${payment.userId} (ref=${ref})`);
             }
             res.writeHead(200);
             res.end('ok');
@@ -457,6 +473,62 @@ function shopierPlugin(): Plugin {
             console.error('[Shopier] Webhook error:', err.message);
             res.writeHead(200);
             res.end('ok');
+          }
+        });
+      });
+
+      // ── POST /api/shopier/register-webhook ───────────────────────────────────
+      server.middlewares.use('/api/shopier/register-webhook', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'POST') { next(); return; }
+        let body = '';
+        req.on('data', (c: Buffer) => { body += c.toString(); });
+        req.on('end', async () => {
+          try {
+            const cfg = readShopierConfig();
+            if (!cfg?.apiKey) { res.writeHead(503); res.end(JSON.stringify({ ok: false, message: 'Shopier yapılandırılmamış.' })); return; }
+            const { webhookBaseUrl } = JSON.parse(body || '{}');
+            const baseUrl = (webhookBaseUrl || '').replace(/\/$/, '');
+            if (!baseUrl) { res.writeHead(400); res.end(JSON.stringify({ ok: false, message: 'webhookBaseUrl gerekli.' })); return; }
+            const webhookUrl = `${baseUrl}/api/shopier/webhook`;
+
+            // List existing webhooks
+            const listResp = await fetch('https://api.shopier.com/v1/webhooks', {
+              headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Accept': 'application/json' }
+            });
+            const existing: any[] = listResp.ok ? await listResp.json() : [];
+
+            // Delete old webhooks pointing to the same base domain
+            for (const wh of existing) {
+              if (wh.url && wh.url.includes('/api/shopier/webhook')) {
+                await fetch(`https://api.shopier.com/v1/webhooks/${wh.id}`, {
+                  method: 'DELETE',
+                  headers: { 'Authorization': `Bearer ${cfg.apiKey}` }
+                });
+                console.log(`[Shopier] Deleted old webhook ${wh.id}`);
+              }
+            }
+
+            // Register new webhook
+            const regResp = await fetch('https://api.shopier.com/v1/webhooks', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${cfg.apiKey}`, 'Content-Type': 'application/json', 'Accept': 'application/json' },
+              body: JSON.stringify({ url: webhookUrl, event: 'order.created' })
+            });
+            const regData = await regResp.json() as any;
+            if (!regResp.ok) {
+              res.writeHead(502);
+              res.end(JSON.stringify({ ok: false, message: regData.message || 'Webhook kaydedilemedi.' }));
+              return;
+            }
+            console.log(`[Shopier] Webhook registered: ${webhookUrl} (id=${regData.id})`);
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true, webhookId: regData.id, webhookUrl }));
+          } catch (err: any) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ ok: false, message: err.message }));
           }
         });
       });

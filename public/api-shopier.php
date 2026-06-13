@@ -174,24 +174,82 @@ if ($path === '/check-payment' && $_SERVER['REQUEST_METHOD'] === 'GET') {
 // ── POST /webhook ────────────────────────────────────────────────────────────
 if ($path === '/webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $payload = json_decode(file_get_contents('php://input'), true) ?? [];
-    error_log('[Shopier Webhook] ' . json_encode($payload));
-    $productId = (string)($payload['product_id'] ?? $payload['productId'] ?? $payload['item_id'] ?? '');
+    error_log('[Shopier Webhook] ' . substr(json_encode($payload), 0, 400));
+
+    // Parse order.created event format: { event, data: { lineItems: [{productId}], paymentStatus } }
+    $orderData  = $payload['data'] ?? $payload;
+    $lineItems  = $orderData['lineItems'] ?? $orderData['line_items'] ?? [];
+    $productId  = '';
+    if (!empty($lineItems)) {
+        $productId = (string)($lineItems[0]['productId'] ?? $lineItems[0]['product_id'] ?? '');
+    }
+    if (!$productId) {
+        $productId = (string)($payload['product_id'] ?? $payload['productId'] ?? $payload['item_id'] ?? '');
+    }
+
     if ($productId) {
         $payments = kvRead('smm_shopier_payments') ?? [];
         foreach ($payments as $ref => &$payment) {
             if ($payment['shopierProductId'] === $productId && $payment['status'] === 'pending') {
-                $paid = shopierCheckOrders($productId);
+                // Trust webhook paymentStatus or verify via API
+                $webhookPaid = in_array($orderData['paymentStatus'] ?? '', ['paid', 'completed'])
+                    || in_array($orderData['status'] ?? '', ['paid', 'fulfilled']);
+                $paid = $webhookPaid || shopierCheckOrders($productId);
                 if ($paid) {
                     creditUser($payment['userId'], $payment['amount']);
                     $payment['status'] = 'completed';
                     $payment['processedAt'] = date('c');
                     kvWrite('smm_shopier_payments', $payments);
+                    error_log('[Shopier Webhook] Credited ' . $payment['amount'] . ' to ' . $payment['userId']);
                 }
                 break;
             }
         }
     }
     echo 'ok';
+    exit;
+}
+
+// ── POST /register-webhook ────────────────────────────────────────────────────
+if ($path === '/register-webhook' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $body = json_decode(file_get_contents('php://input'), true) ?? [];
+    $baseUrl = rtrim($body['webhookBaseUrl'] ?? '', '/');
+    if (!$baseUrl) { http_response_code(400); echo json_encode(['ok' => false, 'message' => 'webhookBaseUrl gerekli.']); exit; }
+    $cfg = shopierConfig();
+    if (!$cfg || empty($cfg['apiKey'])) { http_response_code(503); echo json_encode(['ok' => false, 'message' => 'Shopier yapılandırılmamış.']); exit; }
+    $webhookUrl = $baseUrl . '/api/shopier/webhook';
+
+    // List and delete old webhooks
+    $ch = curl_init(SHOPIER_API . '/webhooks');
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $cfg['apiKey'], 'Accept: application/json'], CURLOPT_TIMEOUT => 10]);
+    $existing = json_decode(curl_exec($ch), true) ?? [];
+    curl_close($ch);
+    foreach ($existing as $wh) {
+        if (!empty($wh['url']) && str_contains($wh['url'], '/api/shopier/webhook')) {
+            $ch2 = curl_init(SHOPIER_API . '/webhooks/' . $wh['id']);
+            curl_setopt_array($ch2, [CURLOPT_RETURNTRANSFER => true, CURLOPT_CUSTOMREQUEST => 'DELETE', CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $cfg['apiKey']], CURLOPT_TIMEOUT => 10]);
+            curl_exec($ch2); curl_close($ch2);
+        }
+    }
+
+    // Register new webhook
+    $ch3 = curl_init(SHOPIER_API . '/webhooks');
+    curl_setopt_array($ch3, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode(['url' => $webhookUrl, 'event' => 'order.created']),
+        CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $cfg['apiKey'], 'Content-Type: application/json', 'Accept: application/json'],
+        CURLOPT_TIMEOUT => 15,
+    ]);
+    $regResp = json_decode(curl_exec($ch3), true) ?? [];
+    $regCode = curl_getinfo($ch3, CURLINFO_HTTP_CODE);
+    curl_close($ch3);
+    if ($regCode >= 200 && $regCode < 300 && !empty($regResp['id'])) {
+        echo json_encode(['ok' => true, 'webhookId' => $regResp['id'], 'webhookUrl' => $webhookUrl]);
+    } else {
+        http_response_code(502);
+        echo json_encode(['ok' => false, 'message' => $regResp['message'] ?? 'Webhook kaydedilemedi.']);
+    }
     exit;
 }
 

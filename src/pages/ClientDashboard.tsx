@@ -146,6 +146,7 @@ export const ClientDashboard: React.FC = () => {
   // tab change we push a new entry.  On popstate we restore the tab.
   const clientTabReady = useRef(false);
   const suppressClientPush = useRef(false);
+  const shopierPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     if (!clientTabReady.current) {
@@ -191,9 +192,7 @@ export const ClientDashboard: React.FC = () => {
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>(paymentMethods[0]?.id || '1');
   const [depositAmount, setDepositAmount] = useState<string>('150');
   const [shopierLoading, setShopierLoading] = useState(false);
-  const [shopierCheckLoading, setShopierCheckLoading] = useState(false);
-  const [shopierPendingRef] = useState(() => localStorage.getItem('shopier_pending_ref') || '');
-  const [shopierBannerDismissed, setShopierBannerDismissed] = useState(false);
+  const [shopierModal, setShopierModal] = useState<{ ref: string; url: string; amount: number; status: 'waiting' | 'success' } | null>(null);
   const [depositConfirm, setDepositConfirm] = useState<{ amount: number; methodName: string; instructions: string; methodId: string; confirmed: boolean } | null>(null);
   const [copiedInstructions, setCopiedInstructions] = useState(false);
 
@@ -470,30 +469,6 @@ export const ClientDashboard: React.FC = () => {
     }
   };
 
-  const handleShopierManualCheck = async () => {
-    const ref = shopierPendingRef;
-    if (!ref) return;
-    setShopierCheckLoading(true);
-    try {
-      const resp = await fetch(`/api/shopier/check-payment?ref=${encodeURIComponent(ref)}`);
-      const data = await resp.json();
-      if (data.status === 'completed' || data.status === 'already_processed') {
-        localStorage.removeItem('shopier_pending_ref');
-        localStorage.removeItem('shopier_pending_amount');
-        showToast(`✅ Ödeme doğrulandı! ₺${data.amount?.toFixed(2)} bakiyenize eklendi.`, 'success');
-        // Trigger server sync to refresh balance
-        setTimeout(() => window.location.reload(), 1500);
-      } else if (data.status === 'pending') {
-        showToast(currentLanguage === 'TR' ? 'Ödeme henüz Shopier tarafından onaylanmadı. Birkaç saniye sonra tekrar deneyin.' : 'Payment not confirmed yet. Try again in a few seconds.', 'error');
-      } else {
-        showToast(data.message || 'Ödeme bulunamadı.', 'error');
-      }
-    } catch {
-      showToast(currentLanguage === 'TR' ? 'Bağlantı hatası.' : 'Connection error.', 'error');
-    }
-    setShopierCheckLoading(false);
-  };
-
   const handleShopierPay = async () => {
     const val = parseFloat(depositAmount);
     if (isNaN(val) || val < 10 || val > 5000) {
@@ -514,19 +489,51 @@ export const ClientDashboard: React.FC = () => {
       });
       const data = await resp.json();
       if (data.ok && data.url) {
-        // Store ref in localStorage so success page can retrieve it after redirect
-        localStorage.setItem('shopier_pending_ref', data.ref);
-        localStorage.setItem('shopier_pending_amount', String(val));
-        window.location.href = data.url;
+        // Open Shopier payment page in a new tab - panel stays open for auto-detection
+        window.open(data.url, '_blank', 'noopener');
+        setShopierModal({ ref: data.ref, url: data.url, amount: val, status: 'waiting' });
       } else {
         showToast(data.message || (currentLanguage === 'TR' ? 'Shopier bağlantısı kurulamadı.' : 'Could not connect to Shopier.'), 'error');
-        setShopierLoading(false);
       }
     } catch {
       showToast(currentLanguage === 'TR' ? 'Bağlantı hatası. Lütfen tekrar deneyin.' : 'Connection error. Please try again.', 'error');
-      setShopierLoading(false);
     }
+    setShopierLoading(false);
   };
+
+  // Auto-poll Shopier payment status while modal is open
+  useEffect(() => {
+    if (!shopierModal || shopierModal.status === 'success') {
+      if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; }
+      return;
+    }
+    const pollRef = shopierModal.ref;
+
+    const checkPayment = async () => {
+      try {
+        const resp = await fetch(`/api/shopier/check-payment?ref=${encodeURIComponent(pollRef)}`);
+        const data = await resp.json();
+        if (data.status === 'completed' || data.status === 'already_processed') {
+          if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; }
+          setShopierModal(prev => prev ? { ...prev, status: 'success' } : null);
+          showToast(`✅ ₺${data.amount?.toFixed(2)} bakiyenize eklendi!`, 'success');
+          setTimeout(() => { setShopierModal(null); window.location.reload(); }, 3000);
+        }
+      } catch {}
+    };
+
+    // Poll every 3 seconds
+    shopierPollRef.current = setInterval(checkPayment, 3000);
+
+    // Also check immediately when user returns to this tab (from Shopier payment page)
+    const onVisibility = () => { if (document.visibilityState === 'visible') checkPayment(); };
+    document.addEventListener('visibilitychange', onVisibility);
+
+    return () => {
+      if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; }
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [shopierModal?.ref, shopierModal?.status]);
 
   const handleDepositSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2011,7 +2018,7 @@ export const ClientDashboard: React.FC = () => {
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
                       </svg>
-                      <span>{currentLanguage === 'TR' ? 'Shopier\'e Yönlendiriliyor...' : 'Redirecting to Shopier...'}</span>
+                      <span>{currentLanguage === 'TR' ? 'Ödeme Sayfası Hazırlanıyor...' : 'Preparing Payment Page...'}</span>
                     </>
                   ) : (
                     <>
@@ -2651,6 +2658,96 @@ export const ClientDashboard: React.FC = () => {
             )}
 
           </div>
+        </div>
+      </div>
+    )}
+
+    {/* ── Shopier Payment Waiting Modal ─────────────────────────────────────── */}
+    {shopierModal && (
+      <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in">
+        <div className="bg-[#0e0e2e] border border-orange-500/30 rounded-3xl p-6 max-w-sm w-full shadow-2xl shadow-orange-500/10 space-y-5">
+
+          {shopierModal.status === 'waiting' ? (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-orange-400 animate-pulse" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                    </svg>
+                  </div>
+                  <span className="text-sm font-bold text-white">
+                    {currentLanguage === 'TR' ? 'Ödeme Bekleniyor' : 'Awaiting Payment'}
+                  </span>
+                </div>
+                <button
+                  onClick={() => { setShopierModal(null); if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; } }}
+                  className="text-gray-500 hover:text-white transition p-1 rounded-lg hover:bg-white/10 cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Amount display */}
+              <div className="bg-orange-500/10 border border-orange-500/20 rounded-2xl p-4 text-center">
+                <p className="text-[10px] text-orange-400 font-bold uppercase tracking-wider mb-1">
+                  {currentLanguage === 'TR' ? 'Yüklenecek Tutar' : 'Amount to Credit'}
+                </p>
+                <p className="text-2xl font-extrabold text-white">₺{shopierModal.amount.toFixed(2)}</p>
+              </div>
+
+              {/* Spinner + instructions */}
+              <div className="flex flex-col items-center gap-3 py-2">
+                <div className="relative w-12 h-12">
+                  <svg className="w-12 h-12 animate-spin text-orange-400" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-20" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3"/>
+                    <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-3 h-3 rounded-full bg-orange-400 animate-pulse" />
+                  </div>
+                </div>
+                <p className="text-xs text-gray-300 text-center leading-relaxed">
+                  {currentLanguage === 'TR'
+                    ? 'Shopier ödeme sayfanız yeni sekmede açıldı. Ödemeyi tamamladıktan sonra bakiyeniz otomatik olarak güncellenecektir.'
+                    : 'Shopier payment page opened in a new tab. Your balance will update automatically after payment.'}
+                </p>
+                <p className="text-[10px] text-gray-500 text-center">
+                  {currentLanguage === 'TR' ? 'Her 3 saniyede bir kontrol ediliyor...' : 'Checking every 3 seconds...'}
+                </p>
+              </div>
+
+              {/* Re-open link */}
+              <a
+                href={shopierModal.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-[#FF6000] hover:bg-[#e55500] text-white font-bold rounded-xl transition-all text-xs"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                {currentLanguage === 'TR' ? 'Ödeme Sayfasını Tekrar Aç' : 'Reopen Payment Page'}
+              </a>
+            </>
+          ) : (
+            <>
+              {/* Success state */}
+              <div className="flex flex-col items-center gap-4 py-4">
+                <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center animate-bounce">
+                  <CheckCircle className="w-8 h-8 text-green-400" />
+                </div>
+                <div className="text-center space-y-1">
+                  <p className="text-base font-extrabold text-white">
+                    {currentLanguage === 'TR' ? 'Ödeme Başarılı!' : 'Payment Successful!'}
+                  </p>
+                  <p className="text-sm text-green-400 font-bold">₺{shopierModal.amount.toFixed(2)}</p>
+                  <p className="text-xs text-gray-400">
+                    {currentLanguage === 'TR' ? 'Bakiyeniz güncelleniyor...' : 'Updating your balance...'}
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     )}
