@@ -758,6 +758,23 @@ function copyFilesAfterBuild(): Plugin {
           console.log(`[cPanel] Copied ${src} → ${dest}`);
         }
       }
+      // data/ klasörünü kopyala (Shopier config, kullanıcı verileri vb.)
+      const srcDataDir = path.resolve('./data');
+      const destDataDir = path.resolve('./dist/data');
+      if (fs.existsSync(srcDataDir)) {
+        if (!fs.existsSync(destDataDir)) fs.mkdirSync(destDataDir, { recursive: true });
+        for (const file of fs.readdirSync(srcDataDir)) {
+          // OTP geçici dosyalarını ve ödeme geçmişini dahil etme — sadece yapılandırma dosyaları
+          const include = [
+            'smm_shopier_config.json',
+            'smm_admin_credentials.json',
+          ];
+          if (include.includes(file)) {
+            fs.copyFileSync(path.join(srcDataDir, file), path.join(destDataDir, file));
+            console.log(`[cPanel] Copied data/${file} → dist/data/${file}`);
+          }
+        }
+      }
     }
   };
 }

@@ -28,7 +28,14 @@ function kvWrite(string $key, mixed $data): void {
 }
 
 function shopierConfig(): ?array {
-    return kvRead('smm_shopier_config');
+    $data = kvRead('smm_shopier_config');
+    if (!$data) return null;
+    // KV wrapper formatını destekle: { "value": "{...}" }
+    if (isset($data['value']) && is_string($data['value'])) {
+        $decoded = json_decode($data['value'], true);
+        return is_array($decoded) ? $decoded : null;
+    }
+    return $data;
 }
 
 function shopierRequest(string $method, string $endpoint, ?array $body = null): ?array {
