@@ -275,6 +275,72 @@ export const Landing: React.FC = () => {
   // Handle Client Authentication
   const [authLoading, setAuthLoading] = useState(false);
 
+  // Google OAuth
+  const [googleEnabled, setGoogleEnabled] = useState(false);
+  const [googleClientId, setGoogleClientId] = useState('');
+  const [googleLoading, setGoogleLoading] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/auth/google/config')
+      .then(r => r.json())
+      .then(d => { setGoogleEnabled(!!d.enabled); setGoogleClientId(d.clientId || ''); })
+      .catch(() => {});
+  }, []);
+
+  // Handle Google OAuth callback redirect: ?gauth_uid=xxx or ?gauth_error=xxx
+  useEffect(() => {
+    if (!isServerSynced) return;
+    const params = new URLSearchParams(window.location.search);
+    const gauthUid = params.get('gauth_uid');
+    const gauthError = params.get('gauth_error');
+    if (gauthError) {
+      const msgs: Record<string, string> = {
+        cancelled: 'Google girişi iptal edildi.',
+        not_configured: 'Google OAuth henüz yapılandırılmamış.',
+        token_failed: 'Google token alınamadı. Lütfen tekrar deneyin.',
+        no_email: 'Google hesabından e-posta alınamadı.',
+        suspended: 'Hesabınız askıya alınmış.',
+        server_error: 'Sunucu hatası oluştu.',
+      };
+      showToast(msgs[gauthError] || 'Google girişi başarısız.', 'error');
+      window.history.replaceState({}, '', '/');
+      return;
+    }
+    if (gauthUid) {
+      window.history.replaceState({}, '', '/');
+      const user = users.find(u => u.id === gauthUid);
+      if (user && user.status !== 'suspended') {
+        doLogin(user);
+      } else if (!user) {
+        fetch('/api/kv/smm_users').then(r => r.json()).then(d => {
+          if (d.value) {
+            const fresh = JSON.parse(d.value);
+            const u = fresh.find((x: any) => x.id === gauthUid);
+            if (u && u.status !== 'suspended') doLogin(u);
+            else showToast('Google ile giriş yapıldı fakat hesap yüklenemedi.', 'error');
+          }
+        }).catch(() => showToast('Hesap yüklenemedi.', 'error'));
+      }
+    }
+  }, [isServerSynced]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleGoogleLogin = async () => {
+    if (!googleEnabled || !googleClientId) {
+      showToast(currentLanguage === 'TR' ? 'Google ile giriş şu anda etkin değil.' : 'Google login is not enabled.', 'error');
+      return;
+    }
+    setGoogleLoading(true);
+    const redirectUri = `${window.location.origin}/api/auth/google/callback`;
+    const params = new URLSearchParams({
+      client_id: googleClientId,
+      redirect_uri: redirectUri,
+      response_type: 'code',
+      scope: 'email profile',
+      access_type: 'online',
+    });
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+  };
+
   const doLogin = (user: { id: string; fullName: string; email: string; balance: number; totalOrders: number; joinedDate: string; status: string }) => {
     if (user.status === 'suspended') {
       showToast(currentLanguage === 'TR' ? 'Hesabınız askıya alınmıştır.' : 'Your account has been suspended.', 'error');
@@ -1259,6 +1325,36 @@ export const Landing: React.FC = () => {
                     </>
                   )}
                 </button>
+
+                {googleEnabled && (
+                  <>
+                    <div className="flex items-center gap-3 my-1">
+                      <div className="flex-1 h-px bg-white/10" />
+                      <span className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                        {currentLanguage === 'TR' ? 'veya' : 'or'}
+                      </span>
+                      <div className="flex-1 h-px bg-white/10" />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleGoogleLogin}
+                      disabled={googleLoading}
+                      className="w-full py-3 bg-white hover:bg-gray-100 text-gray-800 text-xs font-bold rounded-xl flex items-center justify-center gap-2.5 transition-all active:scale-95 cursor-pointer disabled:opacity-60"
+                    >
+                      {googleLoading ? (
+                        <span className="w-4 h-4 border-2 border-gray-400 border-t-gray-800 rounded-full animate-spin" />
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                          <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                          <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                          <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                          <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                        </svg>
+                      )}
+                      <span>{currentLanguage === 'TR' ? 'Google ile Giriş Yap' : 'Continue with Google'}</span>
+                    </button>
+                  </>
+                )}
               </form>
             )}
           </div>

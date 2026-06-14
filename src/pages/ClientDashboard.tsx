@@ -241,6 +241,8 @@ export const ClientDashboard: React.FC = () => {
       if (FOREIGN_PLATFORM_NAMES.some(kw => nameLower.includes(kw.toLowerCase()))) return false;
       // Drop services whose name clearly belongs to a different SMM platform
       if (otherSmm.some(p => nameLower.includes(p.toLowerCase()))) return false;
+      // Drop services priced ≥ ₺8000 per 1000 (too expensive for retail picker)
+      if (s.pricePer1000 >= 8000) return false;
       return true;
     });
   }, [services, orderPlatform]);

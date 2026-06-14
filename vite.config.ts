@@ -189,6 +189,120 @@ function kvStorePlugin(): Plugin {
         next();
       });
 
+      // ── GET /api/auth/google/config — returns { enabled, clientId } ────────
+      server.middlewares.use('/api/auth/google/config', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'GET') { next(); return; }
+        const cfgFile = path.join(DATA_DIR, 'smm_google_oauth_config.json');
+        let cfg: { enabled?: boolean; clientId?: string; clientSecret?: string } = {};
+        if (fs.existsSync(cfgFile)) {
+          try {
+            const raw = JSON.parse(fs.readFileSync(cfgFile, 'utf-8'));
+            cfg = JSON.parse(raw.value || '{}');
+          } catch {}
+        }
+        res.writeHead(200);
+        res.end(JSON.stringify({ enabled: !!cfg.enabled, clientId: cfg.clientId || '' }));
+      });
+
+      // ── GET /api/auth/google/callback — OAuth2 code exchange ────────────
+      server.middlewares.use('/api/auth/google/callback', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        if (req.method !== 'GET') { next(); return; }
+        const urlObj = new URL(req.url!, 'http://localhost');
+        const code = urlObj.searchParams.get('code');
+        const oauthError = urlObj.searchParams.get('error');
+
+        if (oauthError || !code) {
+          res.writeHead(302, { Location: '/?gauth_error=cancelled' });
+          res.end();
+          return;
+        }
+
+        (async () => {
+          try {
+            const cfgFile = path.join(DATA_DIR, 'smm_google_oauth_config.json');
+            let cfg: { enabled?: boolean; clientId?: string; clientSecret?: string } = {};
+            if (fs.existsSync(cfgFile)) {
+              try { cfg = JSON.parse(JSON.parse(fs.readFileSync(cfgFile, 'utf-8')).value || '{}'); } catch {}
+            }
+            if (!cfg.enabled || !cfg.clientId || !cfg.clientSecret) {
+              res.writeHead(302, { Location: '/?gauth_error=not_configured' });
+              res.end();
+              return;
+            }
+
+            const host = req.headers.host || 'localhost:5000';
+            const isSecure = host.includes('.replit.') || host.includes('.repl.co') || host.includes('.app');
+            const protocol = isSecure ? 'https' : 'http';
+            const redirectUri = `${protocol}://${host}/api/auth/google/callback`;
+
+            const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({
+                code,
+                client_id: cfg.clientId,
+                client_secret: cfg.clientSecret,
+                redirect_uri: redirectUri,
+                grant_type: 'authorization_code',
+              }).toString(),
+            });
+            const tokenData: any = await tokenRes.json();
+            if (!tokenData.access_token) {
+              res.writeHead(302, { Location: '/?gauth_error=token_failed' });
+              res.end();
+              return;
+            }
+
+            const profileRes = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+              headers: { Authorization: `Bearer ${tokenData.access_token}` },
+            });
+            const profile: any = await profileRes.json();
+            const { email, name } = profile;
+            if (!email) {
+              res.writeHead(302, { Location: '/?gauth_error=no_email' });
+              res.end();
+              return;
+            }
+
+            const usersFile = path.join(DATA_DIR, 'smm_users.json');
+            let usersArr: any[] = [];
+            if (fs.existsSync(usersFile)) {
+              try { usersArr = JSON.parse(JSON.parse(fs.readFileSync(usersFile, 'utf-8')).value || '[]'); } catch {}
+            }
+
+            let user = usersArr.find((u: any) => u.email?.toLowerCase() === email.toLowerCase());
+            if (!user) {
+              const maxId = usersArr.reduce((m: number, u: any) => Math.max(m, parseInt(u.id) || 0), 100);
+              user = {
+                id: String(maxId + 1),
+                fullName: name || email.split('@')[0],
+                email,
+                balance: 0,
+                totalOrders: 0,
+                joinedDate: new Date().toISOString().split('T')[0],
+                status: 'active',
+              };
+              usersArr.push(user);
+              fs.writeFileSync(usersFile, JSON.stringify({ value: JSON.stringify(usersArr) }), 'utf-8');
+            } else if (user.status === 'suspended') {
+              res.writeHead(302, { Location: '/?gauth_error=suspended' });
+              res.end();
+              return;
+            }
+
+            res.writeHead(302, { Location: `/?gauth_uid=${encodeURIComponent(user.id)}` });
+            res.end();
+          } catch (err: any) {
+            console.error('[GOOGLE AUTH] Hata:', err.message);
+            res.writeHead(302, { Location: '/?gauth_error=server_error' });
+            res.end();
+          }
+        })();
+      });
+
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (!req.url?.startsWith('/api/kv/')) { next(); return; }
         const key = req.url.replace('/api/kv/', '').split('?')[0];
