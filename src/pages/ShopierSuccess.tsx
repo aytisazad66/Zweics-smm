@@ -6,8 +6,8 @@ export const ShopierSuccess: React.FC = () => {
   const [amount, setAmount] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [attempts, setAttempts] = useState(0);
+  const [countdown, setCountdown] = useState(5);
 
-  // ref from URL params (future: if Shopier passes it) or from localStorage (current approach)
   const urlRef = new URLSearchParams(window.location.search).get('ref') || '';
   const ref = urlRef || localStorage.getItem('shopier_pending_ref') || '';
 
@@ -20,27 +20,42 @@ export const ShopierSuccess: React.FC = () => {
     checkPayment();
   }, []);
 
+  // Countdown + auto-redirect after success or error
+  useEffect(() => {
+    if (status !== 'success' && status !== 'error') return;
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          window.location.href = '/';
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [status]);
+
   const checkPayment = async (attempt = 0) => {
     try {
       const resp = await fetch(`/api/shopier/check-payment?ref=${encodeURIComponent(ref)}`);
       const data = await resp.json();
 
-      if (data.status === 'completed') {
+      if (data.status === 'completed' || data.status === 'already_processed') {
         localStorage.removeItem('shopier_pending_ref');
         localStorage.removeItem('shopier_pending_amount');
+        // Signal the main tab that payment is done
+        localStorage.setItem('shopier_payment_done', JSON.stringify({ ref, amount: data.amount, ts: Date.now() }));
         setStatus('success');
         setAmount(data.amount);
-        setMessage(`₺${data.amount.toFixed(2)} bakiyenize eklendi.`);
+        setMessage(data.status === 'already_processed'
+          ? `Bu ödeme daha önce işlendi. ₺${data.amount?.toFixed(2)} bakiyenize eklendi.`
+          : `₺${data.amount.toFixed(2)} bakiyenize eklendi.`
+        );
       } else if (data.status === 'pending' && attempt < 8) {
         setStatus('pending');
         setAttempts(attempt + 1);
         setTimeout(() => checkPayment(attempt + 1), 3000);
-      } else if (data.status === 'already_processed') {
-        localStorage.removeItem('shopier_pending_ref');
-        localStorage.removeItem('shopier_pending_amount');
-        setStatus('success');
-        setAmount(data.amount);
-        setMessage(`Bu ödeme daha önce işlendi. ₺${data.amount?.toFixed(2)} bakiyenize eklendi.`);
       } else {
         setStatus('error');
         setMessage(data.message || 'Ödeme doğrulanamadı. Lütfen yönetici ile iletişime geçin.');
@@ -53,10 +68,6 @@ export const ShopierSuccess: React.FC = () => {
         setMessage('Bağlantı hatası. Lütfen sayfayı yenileyip tekrar deneyin.');
       }
     }
-  };
-
-  const goHome = () => {
-    window.location.href = '/';
   };
 
   return (
@@ -94,7 +105,7 @@ export const ShopierSuccess: React.FC = () => {
 
           {status === 'success' && (
             <>
-              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center animate-bounce-once">
+              <div className="w-20 h-20 mx-auto rounded-full bg-emerald-400/10 border border-emerald-400/20 flex items-center justify-center">
                 <CheckCircle className="w-10 h-10 text-emerald-400" />
               </div>
               <div>
@@ -111,6 +122,7 @@ export const ShopierSuccess: React.FC = () => {
                 <Wallet className="w-4 h-4 text-cyan-400 shrink-0" />
                 <p className="text-xs text-cyan-300">Bakiyeniz anında güncellendi. Sipariş oluşturabilirsiniz.</p>
               </div>
+              <p className="text-xs text-gray-500">{countdown} saniye içinde panele yönlendiriliyorsunuz...</p>
             </>
           )}
 
@@ -127,11 +139,12 @@ export const ShopierSuccess: React.FC = () => {
                 Eğer ödeme yaptıysanız, bakiyeniz kısa süre içinde yönetici tarafından manuel olarak eklenecektir.
                 Referans: <span className="font-mono text-amber-400">{ref}</span>
               </div>
+              <p className="text-xs text-gray-500">{countdown} saniye içinde panele yönlendiriliyorsunuz...</p>
             </>
           )}
 
           <button
-            onClick={goHome}
+            onClick={() => { window.location.href = '/'; }}
             className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4" />

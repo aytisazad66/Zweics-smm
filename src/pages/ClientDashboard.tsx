@@ -489,6 +489,9 @@ export const ClientDashboard: React.FC = () => {
       });
       const data = await resp.json();
       if (data.ok && data.url) {
+        // Save ref to localStorage so ShopierSuccess page (new tab) can find it
+        localStorage.setItem('shopier_pending_ref', data.ref);
+        localStorage.setItem('shopier_pending_amount', String(val));
         // Open Shopier payment page in a new tab - panel stays open for auto-detection
         window.open(data.url, '_blank', 'noopener');
         setShopierModal({ ref: data.ref, url: data.url, amount: val, status: 'waiting' });
@@ -529,9 +532,27 @@ export const ClientDashboard: React.FC = () => {
     const onVisibility = () => { if (document.visibilityState === 'visible') checkPayment(); };
     document.addEventListener('visibilitychange', onVisibility);
 
+    // Cross-tab: ShopierSuccess page writes shopier_payment_done to localStorage → catch it here
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'shopier_payment_done' && e.newValue) {
+        try {
+          const payload = JSON.parse(e.newValue);
+          if (payload.ref === pollRef) {
+            if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; }
+            setShopierModal(prev => prev ? { ...prev, status: 'success' } : null);
+            showToast(`✅ ₺${payload.amount?.toFixed(2)} bakiyenize eklendi!`, 'success');
+            localStorage.removeItem('shopier_payment_done');
+            setTimeout(() => { setShopierModal(null); window.location.reload(); }, 3000);
+          }
+        } catch {}
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
     return () => {
       if (shopierPollRef.current) { clearInterval(shopierPollRef.current); shopierPollRef.current = null; }
       document.removeEventListener('visibilitychange', onVisibility);
+      window.removeEventListener('storage', onStorage);
     };
   }, [shopierModal?.ref, shopierModal?.status]);
 

@@ -1,8 +1,23 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const ShopierFail: React.FC = () => {
-  const ref = new URLSearchParams(window.location.search).get('ref') || '';
+  const ref = new URLSearchParams(window.location.search).get('ref') || localStorage.getItem('shopier_pending_ref') || '';
+  const [countdown, setCountdown] = useState(8);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          window.location.href = '/';
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#0F0F1A] flex items-center justify-center p-4">
@@ -30,16 +45,18 @@ export const ShopierFail: React.FC = () => {
             <p className="text-[10px] text-gray-600 font-mono">Referans: {ref}</p>
           )}
 
+          <p className="text-xs text-gray-500">{countdown} saniye içinde panele yönlendiriliyorsunuz...</p>
+
           <div className="flex flex-col gap-2">
             <button
-              onClick={() => window.location.href = '/'}
+              onClick={() => { window.location.href = '/'; }}
               className="w-full py-3 bg-gradient-to-r from-cyan-400 to-purple-600 text-white font-extrabold rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer active:scale-95"
             >
               <RefreshCw className="w-4 h-4" />
               Tekrar Dene
             </button>
             <button
-              onClick={() => window.location.href = '/'}
+              onClick={() => { window.location.href = '/'; }}
               className="w-full py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-bold rounded-2xl transition flex items-center justify-center gap-2 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
