@@ -107,7 +107,12 @@ export const PLATFORMS = [
   'YouTube',
   'Twitter',
   'Spotify',
-  'Telegram'
+  'Telegram',
+  'Kick',
+  'Twitch',
+  'LinkedIn',
+  'Reddit',
+  'Snapchat',
 ] as const;
 
 export const initialServices: Service[] = [

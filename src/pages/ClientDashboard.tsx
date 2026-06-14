@@ -225,15 +225,15 @@ export const ClientDashboard: React.FC = () => {
 
   // Platform names that should never appear in another platform's service list
   const FOREIGN_PLATFORM_NAMES = [
-    'Facebook', 'Discord', 'LinkedIn', 'Pinterest', 'Reddit',
-    'Twitch', 'Bluesky', 'SoundCloud', 'Snapchat', 'WhatsApp',
-    'Kick', 'Likee', 'Medium', 'GitHub', 'Square',
+    'Facebook', 'Discord', 'Pinterest',
+    'Bluesky', 'SoundCloud', 'WhatsApp',
+    'Likee', 'Medium', 'GitHub', 'Square',
   ];
 
   // Calculate filtered services for order tab
   // Also removes cross-platform contamination by name (e.g. Facebook services filed under Instagram)
   const servicesOfPlatform = useMemo(() => {
-    const otherSmm = ['Instagram','TikTok','YouTube','Twitter','Spotify','Telegram'].filter(p => p !== orderPlatform);
+    const otherSmm = ['Instagram','TikTok','YouTube','Twitter','Spotify','Telegram','Kick','Twitch','LinkedIn','Reddit','Snapchat'].filter(p => p !== orderPlatform);
     return services.filter(s => {
       if (s.status !== 'active' || s.platform !== orderPlatform) return false;
       const nameLower = s.name.toLowerCase();
@@ -259,8 +259,8 @@ export const ClientDashboard: React.FC = () => {
 
     // Filter cross-platform contamination (e.g. Facebook category under Instagram platform)
     const CROSS = [
-      'Facebook', 'Discord', 'Kick.com', 'Linkedin', 'Pinterest',
-      'Reddit', 'Twitch', 'Bluesky', 'SoundCloud', 'MAX -',
+      'Facebook', 'Discord', 'Pinterest',
+      'Bluesky', 'SoundCloud', 'MAX -',
     ];
     for (const kw of CROSS) { if (category.includes(kw)) return null; }
 
@@ -510,6 +510,21 @@ export const ClientDashboard: React.FC = () => {
     } else if (platform === 'Instagram') {
       linkLabel = currentLanguage === 'TR' ? 'Instagram Gönderi Linki' : 'Instagram Post Link';
       linkPlaceholder = 'https://www.instagram.com/p/XXXXXXXXXXX/';
+    } else if (platform === 'Kick') {
+      linkLabel = currentLanguage === 'TR' ? 'Kick Kanal / Yayın Linki' : 'Kick Channel / Stream Link';
+      linkPlaceholder = 'https://kick.com/kanaladi';
+    } else if (platform === 'Twitch') {
+      linkLabel = currentLanguage === 'TR' ? 'Twitch Kanal / Yayın Linki' : 'Twitch Channel / Stream Link';
+      linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+    } else if (platform === 'LinkedIn') {
+      linkLabel = currentLanguage === 'TR' ? 'LinkedIn Profil / Gönderi Linki' : 'LinkedIn Profile / Post Link';
+      linkPlaceholder = 'https://www.linkedin.com/in/kullaniciadi';
+    } else if (platform === 'Reddit') {
+      linkLabel = currentLanguage === 'TR' ? 'Reddit Gönderi / Profil Linki' : 'Reddit Post / Profile Link';
+      linkPlaceholder = 'https://www.reddit.com/r/subreddit/...';
+    } else if (platform === 'Snapchat') {
+      linkLabel = currentLanguage === 'TR' ? 'Snapchat Profil Linki' : 'Snapchat Profile Link';
+      linkPlaceholder = 'https://www.snapchat.com/add/kullaniciadi';
     }
 
     return { needsLink: true, needsUsername: false, linkLabel, linkPlaceholder, usernameLabel: '', usernamePlaceholder: '' };
@@ -525,6 +540,11 @@ export const ClientDashboard: React.FC = () => {
         Twitter: ['twitter.com', 'x.com'],
         Telegram: ['t.me', 'telegram.me', 'telegram.org'],
         Spotify: ['spotify.com'],
+        Kick: ['kick.com'],
+        Twitch: ['twitch.tv'],
+        LinkedIn: ['linkedin.com'],
+        Reddit: ['reddit.com'],
+        Snapchat: ['snapchat.com'],
       };
       const allowed = domains[platform];
       if (allowed && !allowed.some(d => url.hostname.includes(d))) {
@@ -1493,8 +1513,8 @@ export const ClientDashboard: React.FC = () => {
                   {/* Category Grid platform */}
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Ağ Platform Kategorisi' : 'Social Platform Domain'}</label>
-                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
-                      {['Instagram', 'TikTok', 'YouTube', 'Twitter', 'Spotify', 'Telegram'].map(plat => (
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
+                      {['Instagram', 'TikTok', 'YouTube', 'Twitter', 'Spotify', 'Telegram', 'Kick', 'Twitch', 'LinkedIn', 'Reddit', 'Snapchat'].map(plat => (
                         <button
                           key={plat}
                           type="button"
@@ -1823,7 +1843,7 @@ export const ClientDashboard: React.FC = () => {
 
               {/* Platform Filter Buttons */}
               <div className="flex flex-wrap gap-2">
-                {['All', 'Instagram', 'TikTok', 'YouTube', 'Twitter', 'Telegram', 'Spotify'].map(cat => (
+                {['All', 'Instagram', 'TikTok', 'YouTube', 'Twitter', 'Telegram', 'Spotify', 'Kick', 'Twitch', 'LinkedIn', 'Reddit', 'Snapchat'].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setSelectedServicePlatformFilter(cat)}
