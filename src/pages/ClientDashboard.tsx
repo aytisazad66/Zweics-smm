@@ -795,7 +795,8 @@ export const ClientDashboard: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('smm_client_user_id');
+    sessionStorage.removeItem('smm_client_user_id');
+    sessionStorage.removeItem('smm_client_user_cache');
     setClientLoggedIn(false);
     setCurrentClientUser(null);
     setPortalMode('landing');
