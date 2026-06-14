@@ -520,10 +520,15 @@ export const Landing: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
 
           {/* Logo brand */}
-          <BorMediaLogo size="sm" />
+          <a href="#" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="cursor-pointer">
+            <BorMediaLogo size="sm" />
+          </a>
 
           {/* Desktop Nav Items */}
           <div className="hidden md:flex items-center gap-8 text-xs font-semibold text-gray-300">
+            <a href="#" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="hover:text-[#00D4FF] transition-colors">
+              {currentLanguage === 'TR' ? 'Anasayfa' : 'Home'}
+            </a>
             <a href="#services-sec" className="hover:text-[#00D4FF] transition-colors">
               {currentLanguage === 'TR' ? 'Hizmetler & Fiyatlar' : 'Services & Catalog'}
             </a>
@@ -596,6 +601,9 @@ export const Landing: React.FC = () => {
       {mobileMenuOpen && (
         <div className="fixed inset-x-0 top-20 bg-[#0d0d1c] border-b border-white/10 p-5 space-y-4 z-[1400] md:hidden animate-slide-down shadow-2xl">
           <div className="flex flex-col gap-3.5 text-xs font-bold text-gray-300">
+            <a href="#" onClick={() => { window.scrollTo({ top: 0, behavior: 'smooth' }); setMobileMenuOpen(false); }} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
+              {currentLanguage === 'TR' ? 'Anasayfa' : 'Home'}
+            </a>
             <a href="#services-sec" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
               {currentLanguage === 'TR' ? 'Hizmetler & Fiyatlar' : 'Services & Catalog'}
             </a>
