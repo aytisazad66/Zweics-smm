@@ -544,6 +544,35 @@ function shopierPlugin(): Plugin {
         });
       });
 
+      // ── GET /api/shopier/admin-payments ─────────────────────────────────────
+      server.middlewares.use('/api/shopier/admin-payments', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+        if (req.method !== 'GET') { next(); return; }
+        try {
+          const payments = readPayments();
+          const list = Object.entries(payments).map(([ref, p]: [string, any]) => ({
+            ref,
+            userId: p.userId,
+            userName: p.userName,
+            chargeAmount: p.amount,
+            creditAmount: p.creditAmount ?? p.amount,
+            shopierFee: parseFloat(((p.amount - (p.creditAmount ?? p.amount)).toFixed(2))),
+            status: p.status,
+            createdAt: p.createdAt,
+            processedAt: p.processedAt ?? null,
+          }));
+          // En yeni önce
+          list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+          res.writeHead(200);
+          res.end(JSON.stringify({ ok: true, payments: list }));
+        } catch (err: any) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ ok: false, message: err.message }));
+        }
+      });
+
       // ── POST /api/shopier/register-webhook ───────────────────────────────────
       server.middlewares.use('/api/shopier/register-webhook', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
         res.setHeader('Content-Type', 'application/json');
