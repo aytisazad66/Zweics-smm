@@ -299,10 +299,16 @@ export const ClientDashboard: React.FC = () => {
       if (!map[cleanCat]) map[cleanCat] = [];
       map[cleanCat].push(s);
     }
+    // Sort each category's services cheapest → most expensive
     for (const cat of Object.keys(map)) {
       map[cat].sort((a, b) => a.pricePer1000 - b.pricePer1000);
     }
-    return map;
+    // Sort categories themselves by their cheapest service price
+    const sorted: Record<string, typeof filtered> = {};
+    Object.keys(map)
+      .sort((a, b) => map[a][0].pricePer1000 - map[b][0].pricePer1000)
+      .forEach(cat => { sorted[cat] = map[cat]; });
+    return sorted;
   }, [servicesOfPlatform, servicePickerSearch]);
 
   // Sync service selection when active platform changes
