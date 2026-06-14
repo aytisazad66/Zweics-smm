@@ -303,10 +303,38 @@ export const ClientDashboard: React.FC = () => {
     for (const cat of Object.keys(map)) {
       map[cat].sort((a, b) => a.pricePer1000 - b.pricePer1000);
     }
-    // Sort categories themselves by their cheapest service price
+    // Fixed customer-priority order for categories
+    const CATEGORY_PRIORITY: Record<string, number> = {
+      'Takipçi / Abone': 1,
+      'Üye':             2,
+      'Beğeni':          3,
+      'İzlenme':         4,
+      'Kaydet & Paylaşım': 5,
+      'Yorum':           6,
+      'Etkileşim':       7,
+      'Hikaye':          8,
+      'Keşfet':          9,
+      'Canlı Yayın':    10,
+      'Otomatik Beğeni': 11,
+      'Otomatik Yorum':  12,
+      'Otomatik İzlenme':13,
+      'Otomatik':        14,
+      'Gösterim & Erişim':15,
+      'Anket & Oylama':  16,
+      'Reaksiyon & Emoji':17,
+      'Retweet & Paylaşım':18,
+      'Boost':           19,
+      'Organik Paketler':20,
+    };
     const sorted: Record<string, typeof filtered> = {};
     Object.keys(map)
-      .sort((a, b) => map[a][0].pricePer1000 - map[b][0].pricePer1000)
+      .sort((a, b) => {
+        const pa = CATEGORY_PRIORITY[a] ?? 99;
+        const pb = CATEGORY_PRIORITY[b] ?? 99;
+        if (pa !== pb) return pa - pb;
+        // Tie-break: cheapest first
+        return map[a][0].pricePer1000 - map[b][0].pricePer1000;
+      })
       .forEach(cat => { sorted[cat] = map[cat]; });
     return sorted;
   }, [servicesOfPlatform, servicePickerSearch]);
