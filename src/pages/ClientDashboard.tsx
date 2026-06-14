@@ -262,14 +262,10 @@ export const ClientDashboard: React.FC = () => {
     ];
     for (const kw of CROSS) { if (category.includes(kw)) return null; }
 
-    // Map to short clean names — order matters (more specific first)
+    // Map to short clean names — "Otomatik X" merges into X (service name already says Otomatik)
     if (category.includes('Canlı Yayın')) return 'Canlı Yayın';
     if (category.includes('Hikaye')) return 'Hikaye';
     if (category.includes('Keşfet')) return 'Keşfet';
-    if (category.includes('Otomatik') && category.includes('Beğeni')) return 'Otomatik Beğeni';
-    if (category.includes('Otomatik') && category.includes('Yorum')) return 'Otomatik Yorum';
-    if (category.includes('Otomatik') && (category.includes('İzlenme') || category.includes('Görüntülenme'))) return 'Otomatik İzlenme';
-    if (category.includes('Otomatik')) return 'Otomatik';
     if (category.includes('Anket') || category.includes('Oylama')) return 'Anket & Oylama';
     if (category.includes('Reaksiyon') || (category.includes('Emoji') && !category.includes('Beğeni'))) return 'Reaksiyon & Emoji';
     if (category.includes('Retweet') || category.includes('Repost')) return 'Retweet & Paylaşım';
@@ -305,26 +301,22 @@ export const ClientDashboard: React.FC = () => {
     }
     // Fixed customer-priority order for categories
     const CATEGORY_PRIORITY: Record<string, number> = {
-      'Takipçi / Abone':   1,
-      'Üye':               2,
-      'Beğeni':            3,
-      'Organik Paketler':  4,
-      'İzlenme':           5,
-      'Kaydet & Paylaşım': 6,
-      'Yorum':             7,
-      'Etkileşim':         8,
-      'Hikaye':            9,
-      'Keşfet':           10,
-      'Canlı Yayın':      11,
-      'Otomatik Beğeni':  12,
-      'Otomatik Yorum':   13,
-      'Otomatik İzlenme': 14,
-      'Otomatik':         15,
-      'Gösterim & Erişim':16,
-      'Anket & Oylama':   17,
-      'Reaksiyon & Emoji':18,
-      'Retweet & Paylaşım':19,
-      'Boost':            20,
+      'Takipçi / Abone':    1,
+      'Üye':                2,
+      'Beğeni':             3,
+      'Organik Paketler':   4,
+      'İzlenme':            5,
+      'Kaydet & Paylaşım':  6,
+      'Yorum':              7,
+      'Etkileşim':          8,
+      'Hikaye':             9,
+      'Keşfet':            10,
+      'Canlı Yayın':       11,
+      'Gösterim & Erişim': 12,
+      'Anket & Oylama':    13,
+      'Reaksiyon & Emoji': 14,
+      'Retweet & Paylaşım':15,
+      'Boost':             16,
     };
     const sorted: Record<string, typeof filtered> = {};
     Object.keys(map)
