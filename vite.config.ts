@@ -285,25 +285,12 @@ function shopierPlugin(): Plugin {
     return { id: String(data.id), url: data.url };
   }
 
-  async function shopierCheckOrders(apiKey: string, productId: string): Promise<boolean> {
-    // Shopier sipariş durumu: ödenmemiş = paymentStatus:"pending" | ödenmis = paymentStatus:"paid"
-    // status="unfulfilled" hem ödenmemiş hem ödenmişlerde olabilir — güvenilmez, kullanma
-    // SADECE paymentStatus === 'paid' veya 'completed' kabul edilir
-    try {
-      const r = await fetch(`https://api.shopier.com/v1/orders?product_id=${productId}&limit=20`, {
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
-      });
-      if (r.ok) {
-        const data = await r.json() as any;
-        const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
-        // SADECE paymentStatus kontrolü — status alanı güvenilmez (unfulfilled = shipped değil, paid değil)
-        if (list.some((o: any) =>
-          o.paymentStatus === 'paid' || o.paymentStatus === 'completed'
-        )) return true;
-      }
-    } catch {}
-    // NOT: stockQuantity === 0 kontrolü KALDIRILDI
-    // Shopier dijital ürünlerde stockQuantity'yi ödeme olmadan da 0 yapabiliyor — güvensiz
+  // GÜVENLİK: Bu fonksiyon ARTIK çağrılmıyor.
+  // Shopier orders API product_id filtresini yok sayıp tüm hesap siparişlerini döndürüyor.
+  // Bu, eski ödenmişlerin false positive vermesine neden olur.
+  // Bakiye sadece webhook üzerinden ekleniyor (aşağıda shopierPlugin webhook handler'ı).
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  async function shopierCheckOrders(_apiKey: string, _productId: string): Promise<boolean> {
     return false;
   }
 
@@ -383,41 +370,18 @@ function shopierPlugin(): Plugin {
             const payments = readPayments();
             const payment = payments[ref];
             if (!payment) { res.writeHead(404); res.end(JSON.stringify({ ok: false, status: 'not_found', message: 'Ödeme kaydı bulunamadı.' })); return; }
+            // GÜVENLİK: Bakiye SADECE Shopier webhook'u paymentStatus:'paid' gönderince eklenir.
+            // Bu endpoint Shopier API'sine hiç sorgu ATMAZ — sadece yerel kayda bakar.
+            // Böylece Shopier orders API'sinin hatalı veri döndürmesi bakiye ekleyemez.
             if (payment.status === 'completed') {
               const creditedAmount = payment.creditAmount ?? payment.amount;
               res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'already_processed', amount: creditedAmount }));
+              res.end(JSON.stringify({ ok: true, status: 'completed', amount: creditedAmount }));
               return;
             }
-            // Güvenlik: ürün oluşturulduktan sonra en az 15 saniye geçmeden onaylanmasın
-            const createdAt = payment.createdAt ? new Date(payment.createdAt).getTime() : 0;
-            const elapsedSec = (Date.now() - createdAt) / 1000;
-            if (elapsedSec < 15) {
-              res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.creditAmount ?? payment.amount }));
-              return;
-            }
-            const paid = await shopierCheckOrders(cfg.apiKey, payment.shopierProductId);
-            if (paid) {
-              // Add balance to user — use creditAmount (komisyonsuz) if present
-              const toCredit = payment.creditAmount ?? payment.amount;
-              const users = readUsers();
-              const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
-              if (userIdx >= 0) {
-                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + toCredit).toFixed(2));
-                writeUsers(users);
-              }
-              // Mark payment as completed
-              payments[ref].status = 'completed';
-              payments[ref].processedAt = new Date().toISOString();
-              writePayments(payments);
-              console.log(`[Shopier] Payment ${ref} confirmed. ₺${toCredit} credited to ${payment.userId}`);
-              res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'completed', amount: toCredit }));
-            } else {
-              res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.amount }));
-            }
+            // Henüz webhook gelmedi — pending döndür
+            res.writeHead(200);
+            res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.creditAmount ?? payment.amount }));
           } catch (err: any) {
             res.writeHead(500);
             res.end(JSON.stringify({ ok: false, status: 'error', message: err.message }));
@@ -457,10 +421,12 @@ function shopierPlugin(): Plugin {
             const payment = payments[ref];
             if (payment.status === 'completed') { res.writeHead(200); res.end('ok'); return; }
 
-            // Check payment status: either trust webhook paymentStatus or verify via API
-            const webhookPaid = orderData.paymentStatus === 'paid' || orderData.paymentStatus === 'completed'
-              || orderData.status === 'paid' || orderData.status === 'fulfilled';
-            const paid = webhookPaid || await shopierCheckOrders(cfg.apiKey, productId);
+            // GÜVENLİK: Webhook'ta SADECE paymentStatus === 'paid' kabul edilir.
+            // status === 'fulfilled' veya status === 'paid' KABUL EDİLMEZ — Shopier order.created eventi
+            // ile ödeme yapılmadan 'unfulfilled' status'u gelebilir.
+            // Webhook'ta paymentStatus 'paid' değilse API'ye tekrar sormuyoruz — false positive riski.
+            const webhookPaid = orderData.paymentStatus === 'paid' || orderData.paymentStatus === 'completed';
+            const paid = webhookPaid;
 
             if (paid) {
               const toCredit = payment.creditAmount ?? payment.amount;
