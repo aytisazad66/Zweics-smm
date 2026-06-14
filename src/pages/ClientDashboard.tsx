@@ -228,7 +228,48 @@ export const ClientDashboard: React.FC = () => {
     return services.filter(s => s.status === 'active' && s.platform === orderPlatform);
   }, [services, orderPlatform]);
 
-  // Group services by category, each group sorted cheapest → most expensive
+  // Maps raw TürkPaneli category names → clean display category
+  // Returns null for categories that should be hidden from customers
+  const getCleanCategory = (category: string): string | null => {
+    const HIDDEN = [
+      'Bakıma Alınan', 'Bakımda Olan', 'Geçici Bozuk', 'TEST ALANI',
+      'API Servisleri', 'Private Person', 'Square', 'Medium', 'GitHub',
+      'Likee', 'SnapChat', 'Whatsapp', 'Android', 'Markanı Tüm',
+    ];
+    for (const kw of HIDDEN) { if (category.includes(kw)) return null; }
+
+    // Filter cross-platform contamination (e.g. Facebook category under Instagram platform)
+    const CROSS = [
+      'Facebook', 'Discord', 'Kick.com', 'Linkedin', 'Pinterest',
+      'Reddit', 'Twitch', 'Bluesky', 'SoundCloud', 'MAX -',
+    ];
+    for (const kw of CROSS) { if (category.includes(kw)) return null; }
+
+    // Map to short clean names — order matters (more specific first)
+    if (category.includes('Canlı Yayın')) return 'Canlı Yayın';
+    if (category.includes('Hikaye')) return 'Hikaye';
+    if (category.includes('Keşfet')) return 'Keşfet';
+    if (category.includes('Otomatik') && category.includes('Beğeni')) return 'Otomatik Beğeni';
+    if (category.includes('Otomatik') && category.includes('Yorum')) return 'Otomatik Yorum';
+    if (category.includes('Otomatik') && (category.includes('İzlenme') || category.includes('Görüntülenme'))) return 'Otomatik İzlenme';
+    if (category.includes('Otomatik')) return 'Otomatik';
+    if (category.includes('Anket') || category.includes('Oylama')) return 'Anket & Oylama';
+    if (category.includes('Reaksiyon') || (category.includes('Emoji') && !category.includes('Beğeni'))) return 'Reaksiyon & Emoji';
+    if (category.includes('Retweet') || category.includes('Repost')) return 'Retweet & Paylaşım';
+    if (category.includes('Boost')) return 'Boost';
+    if (category.includes('Gösterim') || category.includes('Erişim')) return 'Gösterim & Erişim';
+    if (category.includes('Kaydet') || category.includes('Paylaşım')) return 'Kaydet & Paylaşım';
+    if (category.includes('Etkileşim')) return 'Etkileşim';
+    if (category.includes('Takipçi') || category.includes('Abone')) return 'Takipçi / Abone';
+    if (category.includes('Üye')) return 'Üye';
+    if (category.includes('Beğeni')) return 'Beğeni';
+    if (category.includes('Yorum')) return 'Yorum';
+    if (category.includes('İzlenme') || category.includes('Görüntülenme')) return 'İzlenme';
+    if (category.includes('Organik') || category.includes('Özel Görev') || category.includes('Önerilen')) return 'Organik Paketler';
+    return null; // hide anything else we can't cleanly categorize
+  };
+
+  // Group services by clean category, each group sorted cheapest → most expensive
   const groupedServicesForPicker = useMemo(() => {
     const searchLower = servicePickerSearch.toLowerCase();
     const filtered = servicesOfPlatform.filter(
@@ -236,8 +277,10 @@ export const ClientDashboard: React.FC = () => {
     );
     const map: Record<string, typeof filtered> = {};
     for (const s of filtered) {
-      if (!map[s.category]) map[s.category] = [];
-      map[s.category].push(s);
+      const cleanCat = getCleanCategory(s.category);
+      if (cleanCat === null) continue;
+      if (!map[cleanCat]) map[cleanCat] = [];
+      map[cleanCat].push(s);
     }
     for (const cat of Object.keys(map)) {
       map[cat].sort((a, b) => a.pricePer1000 - b.pricePer1000);
