@@ -1,7 +1,7 @@
 export interface Service {
   id: string;
   name: string;
-  platform: 'Instagram' | 'TikTok' | 'YouTube' | 'Twitter' | 'Spotify' | 'Telegram' | 'Kick' | 'Twitch' | 'LinkedIn' | 'Reddit' | 'Snapchat';
+  platform: 'Instagram' | 'TikTok' | 'YouTube' | 'Twitter' | 'Spotify' | 'Telegram' | 'Kick' | 'Twitch' | 'LinkedIn' | 'Reddit';
   category: string;
   min: number;
   max: number;
@@ -112,7 +112,6 @@ export const PLATFORMS = [
   'Twitch',
   'LinkedIn',
   'Reddit',
-  'Snapchat',
 ] as const;
 
 export const initialServices: Service[] = [
