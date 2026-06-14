@@ -556,6 +556,29 @@ export const ClientDashboard: React.FC = () => {
 
   const orderInputConfig = activeServiceObj ? getOrderInputConfig(activeServiceObj.name, activeServiceObj.platform) : null;
 
+  // Platform-specific profile URL builder
+  const buildProfileUrl = (platform: string, username: string): string => {
+    const u = username.replace(/^@/, '').trim();
+    switch (platform) {
+      case 'Instagram':  return `https://www.instagram.com/${u}`;
+      case 'TikTok':     return `https://www.tiktok.com/@${u}`;
+      case 'YouTube':    return `https://www.youtube.com/@${u}`;
+      case 'Twitter':    return `https://twitter.com/${u}`;
+      case 'Telegram':   return `https://t.me/${u}`;
+      case 'Spotify':    return `https://open.spotify.com/user/${u}`;
+      case 'Reddit':     return `https://www.reddit.com/user/${u}`;
+      case 'Kick':       return `https://kick.com/${u}`;
+      case 'Twitch':     return `https://www.twitch.tv/${u}`;
+      case 'LinkedIn':   return `https://www.linkedin.com/in/${u}`;
+      case 'Facebook':   return `https://www.facebook.com/${u}`;
+      case 'Pinterest':  return `https://www.pinterest.com/${u}`;
+      case 'Snapchat':   return `https://www.snapchat.com/add/${u}`;
+      case 'Threads':    return `https://www.threads.net/@${u}`;
+      case 'Discord':    return `https://discord.com/users/${u}`;
+      default:           return `https://www.${platform.toLowerCase().replace(/\s+/g, '')}.com/${u}`;
+    }
+  };
+
   // Simulation handlers
   const handlePlaceOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -581,7 +604,7 @@ export const ClientDashboard: React.FC = () => {
       return;
     }
 
-    const targetLink = needsUsername ? `https://profile/${orderUsername}` : orderLink;
+    const targetLink = needsUsername ? buildProfileUrl(activeServiceObj!.platform, orderUsername) : orderLink;
     const newOrderId = await placeClientOrder(selectedServiceId, orderQuantity, targetLink, orderUsername);
     if (newOrderId) {
       setOrderLink('');

@@ -45,12 +45,29 @@ h1, h2, h3, h4, h5, h6 {
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* Exclude SVG chart elements from global transitions — prevents static/grain
+   flickering (karıncalanma) on cPanel production builds caused by backdrop-filter
+   recalculation during hover state changes on SVG paths */
+svg path,
+svg circle,
+svg ellipse,
+svg rect,
+svg line,
+svg polyline,
+svg polygon {
+  transition: none !important;
+}
+
 /* Glassmorphism Classes */
 .glass-panel {
   background: rgba(26, 26, 46, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  /* Force GPU compositing layer to prevent backdrop-filter repaint artifacts
+     (static/grain noise) on mobile Chrome in production builds */
+  transform: translateZ(0);
+  isolation: isolate;
 }
 
 .glass-panel:hover {

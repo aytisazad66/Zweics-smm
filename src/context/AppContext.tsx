@@ -533,6 +533,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   
   // Custom Operations: Tickets
   const replyTicket = (ticketId: string, text: string, sender: 'admin' | 'user') => {
+    // Find ticket before state update so we can use it for side effects
+    const ticket = tickets.find(t => t.id === ticketId);
+
     setTickets(prev => prev.map(t => {
       if (t.id === ticketId) {
         const newMessage = {
@@ -552,6 +555,86 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return t;
     }));
+
+    // Admin reply side-effects: in-app user notification + email
+    if (sender === 'admin' && ticket) {
+      const notifText = `Destek talebiniz "${ticket.subject}" cevaplandı. Yanıt: ${text.substring(0, 80)}${text.length > 80 ? '...' : ''}`;
+      const notifDate = new Date().toISOString();
+
+      // In-app notification saved to user object
+      setUsers(prev => prev.map(u => {
+        if (u.id === ticket.userId) {
+          const newNotif: UserNotification = {
+            id: Math.random().toString(36).substr(2, 9),
+            text: notifText,
+            date: notifDate,
+            read: false,
+          };
+          return { ...u, notifications: [newNotif, ...(u.notifications ?? [])] };
+        }
+        return u;
+      }));
+
+      // Also update currentClientUser if they are currently logged in
+      if (currentClientUser?.id === ticket.userId) {
+        const newNotif: UserNotification = {
+          id: Math.random().toString(36).substr(2, 9),
+          text: notifText,
+          date: notifDate,
+          read: false,
+        };
+        setCurrentClientUser(prev => prev
+          ? { ...prev, notifications: [newNotif, ...(prev.notifications ?? [])] }
+          : prev
+        );
+      }
+
+      // Email notification to client (fire-and-forget, only if SMTP configured)
+      const user = users.find(u => u.id === ticket.userId);
+      if (user?.email && smtpConfig.host && smtpConfig.user && smtpConfig.pass) {
+        const emailHtml = `
+          <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;background:#0F0F1A;color:#eeeeff;padding:30px;border-radius:12px;">
+            <div style="text-align:center;margin-bottom:24px;">
+              <h1 style="color:#00D4FF;font-size:22px;margin:0;">Bor Media</h1>
+              <p style="color:#666;font-size:12px;margin:4px 0 0;">SMM Panel</p>
+            </div>
+            <h2 style="color:#eeeeff;font-size:18px;border-bottom:1px solid #2A2A4A;padding-bottom:12px;">
+              ✅ Destek Talebiniz Cevaplandı
+            </h2>
+            <p style="color:#aaa;">Merhaba <strong style="color:#eeeeff;">${user.fullName}</strong>,</p>
+            <p style="color:#aaa;">
+              <strong>#${ticket.id}</strong> numaralı "<strong style="color:#eeeeff;">${ticket.subject}</strong>"
+              konulu destek talebiniz ekibimiz tarafından yanıtlandı.
+            </p>
+            <div style="background:#1A1A2E;border-left:4px solid #7B2FFF;padding:16px 20px;border-radius:8px;margin:20px 0;">
+              <p style="color:#aaa;font-size:12px;margin:0 0 8px;">Ekip yanıtı:</p>
+              <p style="color:#eeeeff;margin:0;white-space:pre-wrap;">${text.replace(/</g,'&lt;').replace(/>/g,'&gt;')}</p>
+            </div>
+            <p style="color:#aaa;font-size:13px;">
+              Yanıtlamak veya talebi görüntülemek için panele giriş yapabilirsiniz.
+            </p>
+            <hr style="border:none;border-top:1px solid #2A2A4A;margin:24px 0;">
+            <p style="color:#555;font-size:11px;text-align:center;">
+              Bu e-posta Bor Media SMM Panel tarafından otomatik olarak gönderilmiştir.
+            </p>
+          </div>
+        `;
+        fetch('/api/mail', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            to: user.email,
+            subject: `Destek Talebiniz Cevaplandı: ${ticket.subject} [#${ticket.id}]`,
+            body: emailHtml,
+            smtp_host: smtpConfig.host,
+            smtp_port: smtpConfig.port,
+            smtp_user: smtpConfig.user,
+            smtp_pass: smtpConfig.pass,
+            from_name: smtpConfig.fromName || 'Bor Media',
+          }),
+        }).catch(() => {});
+      }
+    }
   };
   
   const toggleTicketStatus = (ticketId: string, status: Ticket['status']) => {
