@@ -824,6 +824,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (combined.includes('twitter') || combined.includes('tweet') || combined.includes(' x ')) return 'Twitter';
     if (combined.includes('spotify')) return 'Spotify';
     if (combined.includes('telegram')) return 'Telegram';
+    if (combined.includes('kick')) return 'Kick';
+    if (combined.includes('twitch')) return 'Twitch';
+    if (combined.includes('linkedin')) return 'LinkedIn';
+    if (combined.includes('reddit')) return 'Reddit';
+    if (combined.includes('snapchat') || combined.includes('snap chat')) return 'Snapchat';
     return 'Instagram';
   };
 

@@ -1,7 +1,7 @@
 export interface Service {
   id: string;
   name: string;
-  platform: 'Instagram' | 'TikTok' | 'YouTube' | 'Twitter' | 'Spotify' | 'Telegram';
+  platform: 'Instagram' | 'TikTok' | 'YouTube' | 'Twitter' | 'Spotify' | 'Telegram' | 'Kick' | 'Twitch' | 'LinkedIn' | 'Reddit' | 'Snapchat';
   category: string;
   min: number;
   max: number;
