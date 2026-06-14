@@ -101,10 +101,20 @@ $path = str_replace('/api-shopier.php', '', $path);
 // ── POST /create-product ─────────────────────────────────────────────────────
 if ($path === '/create-product' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $body = json_decode(file_get_contents('php://input'), true);
-    $amount = floatval($body['amount'] ?? 0);
-    if ($amount < 10 || $amount > 5000) {
+    // Frontend sends chargeAmount (Shopier'a ödenecek, komisyon dahil)
+    // ve creditAmount (kullanıcı bakiyesine eklenecek tutar).
+    // Eski 'amount' alanı artık gönderilmiyor — her ikisini de destekle.
+    $creditAmount = floatval($body['creditAmount'] ?? $body['amount'] ?? 0);
+    $chargeAmount = floatval($body['chargeAmount'] ?? $body['amount'] ?? $creditAmount);
+    // Doğrulama: bakiyeye eklenecek tutar 10-5000 TL arasında olmalı
+    if ($creditAmount < 10 || $creditAmount > 5000) {
         http_response_code(400);
         echo json_encode(['ok' => false, 'message' => 'Tutar 10 TL ile 5.000 TL arasında olmalıdır.']);
+        exit;
+    }
+    if ($chargeAmount < 10 || $chargeAmount > 6000) {
+        http_response_code(400);
+        echo json_encode(['ok' => false, 'message' => 'Ödenecek tutar geçersiz.']);
         exit;
     }
     $cfg = shopierConfig();
@@ -118,11 +128,11 @@ if ($path === '/create-product' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $ref       = generateRef();
     $imageUrl  = $cfg['productImageUrl'] ?? 'https://cdn.pixabay.com/photo/2020/05/18/16/17/social-media-5187243_1280.png';
     $product   = shopierRequest('POST', '/products', [
-        'title'         => 'Bakiye Yüklemesi - ' . number_format($amount, 2) . ' TL',
+        'title'         => 'Bakiye Yüklemesi - ' . number_format($creditAmount, 2) . ' TL',
         'description'   => 'Bakiyesi (' . $userName . ')',
         'type'          => 'digital',
         'media'         => [['url' => $imageUrl, 'type' => 'image', 'placement' => 1]],
-        'priceData'     => ['price' => $amount, 'currency' => 'TRY'],
+        'priceData'     => ['price' => $chargeAmount, 'currency' => 'TRY'],
         'shippingPayer' => 'sellerPays',
         'stockQuantity' => 1,
     ]);
@@ -137,7 +147,8 @@ if ($path === '/create-product' && $_SERVER['REQUEST_METHOD'] === 'POST') {
         'shopierProductUrl' => $product['url'],
         'userId'            => $userId,
         'userName'          => $userName,
-        'amount'            => $amount,
+        'amount'            => $creditAmount,
+        'chargeAmount'      => $chargeAmount,
         'status'            => 'pending',
         'createdAt'         => date('c'),
         'processedAt'       => null,

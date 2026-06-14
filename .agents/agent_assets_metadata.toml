@@ -5,4 +5,10 @@ generated = []
 id = "de4smy1KWY-e9xy3Br8x0"
 uri = "file://bormedya-cpanel.zip"
 type = "unspecified"
-title = "bormedya-cpanel.zip — cPanel'e yüklenecek dosyalar"
+title = "bormedya-cpanel.zip (Düzeltilmiş)"
+
+[[outputs]]
+id = "NpnJKu46eVvITygy3MIiH"
+uri = "file://bormedya-cpanel.tar.gz"
+type = "unspecified"
+title = "bormedya-cpanel.tar.gz (Düzeltilmiş)"
