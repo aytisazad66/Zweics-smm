@@ -761,11 +761,22 @@ export const ClientDashboard: React.FC = () => {
               {/* Header with Title and Close Button */}
               <div className="flex items-center justify-between border-b border-white/5 pb-4">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-400 to-purple-600 flex items-center justify-center font-black text-white text-sm">
-                    S
-                  </div>
+                  <svg width="30" height="30" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+                    <defs>
+                      <radialGradient id="bm-menu-grad" cx="35%" cy="30%" r="70%">
+                        <stop offset="0%" stopColor="#00D4FF" />
+                        <stop offset="55%" stopColor="#7B2FFF" />
+                        <stop offset="100%" stopColor="#0a0a1a" />
+                      </radialGradient>
+                    </defs>
+                    <circle cx="26" cy="26" r="25" fill="url(#bm-menu-grad)" />
+                    <circle cx="26" cy="26" r="24.5" stroke="rgba(255,255,255,0.12)" strokeWidth="1" fill="none" />
+                    <text x="26" y="23" textAnchor="middle" fill="white" fontSize="11" fontWeight="800" fontFamily="'Sora','Inter',sans-serif" letterSpacing="2.5">BOR</text>
+                    <line x1="10" y1="26.5" x2="42" y2="26.5" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+                    <text x="26" y="37" textAnchor="middle" fill="rgba(180,210,255,0.95)" fontSize="9" fontWeight="700" fontFamily="'Sora','Inter',sans-serif" letterSpacing="2">MEDIA</text>
+                  </svg>
                   <div>
-                    <span className="font-black text-xs text-white uppercase tracking-wider block">SMM PORTAL</span>
+                    <span className="font-black text-xs text-white uppercase tracking-wider block">BOR MEDYA</span>
                     <span className="text-[8px] text-gray-500 font-mono tracking-wider block">NAVIGATION GATE</span>
                   </div>
                 </div>
@@ -943,15 +954,26 @@ export const ClientDashboard: React.FC = () => {
             <Menu className="w-5 h-5 text-cyan-400" />
           </button>
 
-          <div className="w-8 h-8 sm:w-9 h-9 rounded-xl bg-gradient-to-tr from-cyan-400 via-[#7B2FFF] to-purple-600 flex items-center justify-center font-black text-white shadow-lg text-sm sm:text-base shrink-0">
-            S
-          </div>
+          <svg width="34" height="34" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg" className="shrink-0">
+            <defs>
+              <radialGradient id="bm-topbar-grad" cx="35%" cy="30%" r="70%">
+                <stop offset="0%" stopColor="#00D4FF" />
+                <stop offset="55%" stopColor="#7B2FFF" />
+                <stop offset="100%" stopColor="#0a0a1a" />
+              </radialGradient>
+            </defs>
+            <circle cx="26" cy="26" r="25" fill="url(#bm-topbar-grad)" />
+            <circle cx="26" cy="26" r="24.5" stroke="rgba(255,255,255,0.12)" strokeWidth="1" fill="none" />
+            <text x="26" y="23" textAnchor="middle" fill="white" fontSize="11" fontWeight="800" fontFamily="'Sora','Inter',sans-serif" letterSpacing="2.5">BOR</text>
+            <line x1="10" y1="26.5" x2="42" y2="26.5" stroke="rgba(255,255,255,0.2)" strokeWidth="0.5" />
+            <text x="26" y="37" textAnchor="middle" fill="rgba(180,210,255,0.95)" fontSize="9" fontWeight="700" fontFamily="'Sora','Inter',sans-serif" letterSpacing="2">MEDIA</text>
+          </svg>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-xs sm:text-sm tracking-wide text-white font-sora block leading-none">MÜŞTERİ PORTALI</span>
+              <span className="font-extrabold text-xs sm:text-sm tracking-wide text-white font-sora block leading-none">BOR MEDYA</span>
               <span className="px-1 py-0.5 rounded bg-cyan-500/10 text-cyan-400 text-[7px] sm:text-[8px] font-mono font-bold uppercase tracking-wider">v2.4 PRO</span>
             </div>
-            <span className="text-[8px] sm:text-[9px] text-gray-500 font-mono tracking-wider mt-0.5 hidden sm:block uppercase">Dynamic API Fulfillment Console</span>
+            <span className="text-[8px] sm:text-[9px] text-gray-500 font-mono tracking-wider mt-0.5 hidden sm:block uppercase">NAVIGATION GATE</span>
           </div>
         </div>
 
@@ -1021,7 +1043,7 @@ export const ClientDashboard: React.FC = () => {
               className="w-full py-3 bg-gradient-to-r from-cyan-400 to-purple-600 text-[#090915] hover:text-white font-extrabold text-xs rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
             >
               <Wallet className="w-4 h-4 shrink-0" />
-              <span>{currentLanguage === 'TR' ? 'PayTR ile Bakiye Ekle' : 'Deposit Funds'}</span>
+              <span>{currentLanguage === 'TR' ? 'Bakiye Ekle' : 'Deposit Funds'}</span>
             </button>
           </div>
 
@@ -1147,7 +1169,7 @@ export const ClientDashboard: React.FC = () => {
                   <span className="text-gray-500 font-extrabold uppercase text-[10px] tracking-wider block">{currentLanguage === 'TR' ? 'Mevcut Bakiye' : 'Asset Wallet'}</span>
                   <div className="mt-2 text-xl font-extrabold font-mono text-cyan-400">₺{currentClientUser.balance.toFixed(2)}</div>
                   <button onClick={() => setActiveTab('add-funds')} className="text-gray-400 hover:text-white mt-2 block font-extrabold hover:underline text-[10px]">
-                    {currentLanguage === 'TR' ? 'Hızlı Bakiye Ekle →' : 'Deposit assets →'}
+                    {currentLanguage === 'TR' ? 'Bakiye Ekle →' : 'Deposit assets →'}
                   </button>
                 </div>
 
