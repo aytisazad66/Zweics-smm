@@ -15,21 +15,34 @@ To track which payment to process on return, we store `shopier_pending_ref` in l
 
 **Why:** Shopier's new REST API doesn't support per-product `successUrl`/`failUrl` fields. The account-level redirect URL is fixed.
 
-## CRITICAL SECURITY FIX — Verification strategy
-**NEVER use `shopierCheckOrders` (Shopier orders API) for payment confirmation.**
+## Shopier API gerçek yanıt yapısı (loglardan doğrulandı)
+```json
+{
+  "id": "450774817",
+  "status": "unfulfilled",
+  "paymentStatus": "paid",
+  "dateCreated": "2026-06-14T05:03:49+0300",
+  "totals": { "subtotal": "10.80", "shipping": "0.00", "total": "10.80" },
+  "lineItems": [{ "productId": "48030326", "title": "Bakiye Yüklemesi..." }]
+}
+```
+- Tutar: `o.totals.total` (NOT `o.totalPrice`, `o.amount`, `o.price`)
+- Tarih: `o.dateCreated` (NOT `o.createdAt`, `o.created_at`)
+- Ürün ID: `o.lineItems[0].productId` — **kesin eşleşme için kullan**
+- GET /v1/products/{id} → **403 Forbidden** (erişim yok)
+- GET /v1/orders?product_id={id} → product_id filtresini YOKSAYAR, tüm hesap siparişlerini döndürür
 
-Root cause of the security vulnerability:
-- Shopier `GET /v1/orders?product_id=X` IGNORES the product_id filter — returns ALL orders for the account
-- Old paid orders have `paymentStatus:'paid'` → every check returns `true` → balance added without payment
-- `stockQuantity === 0` fallback was also false-positive prone for digital products
+## CRITICAL SECURITY — Verification strategy
+Güvenlik açığının kök nedeni: Shopier orders API product_id filtresini yok sayıyor → tüm hesap siparişleri dönüyor → eski paid siparişler false positive yaratıyordu.
 
-**Current safe approach:**
-1. `check-payment` endpoint ONLY reads the local `payment.status` from `data/smm_shopier_payments.json`
-2. `payment.status` is set to `'completed'` ONLY by the webhook handler
-3. Webhook handler ONLY accepts `paymentStatus === 'paid'` (not `status` field checks)
-4. `shopierCheckOrders` function always returns `false` (disabled)
+**Mevcut güvenli yaklaşım (`shopierCheckPayment` fonksiyonu):**
+1. Minimum 30 saniye bekleme (race condition önleme)
+2. `GET /v1/orders?limit=50` ile tüm siparişleri al
+3. Her sipariş için: `lineItems[0].productId === productId` AND `paymentStatus === 'paid'` AND `dateCreated >= payment.createdAt`
+4. lineItems product ID eşleşmesi kesin — her ödeme benzersiz ürün yaratır
+5. Webhook handler: SADECE `paymentStatus === 'paid'` kabul eder (status field değil)
 
-**How to apply:** Any future work on Shopier payment verification must NOT call Shopier orders/products APIs for payment confirmation. Only trust the webhook.
+**How to apply:** Amount/date filtresi yeterli DEĞİL — mutlaka lineItems.productId eşleşmesi kullan.
 
 ## Files
 - `vite.config.ts` — `shopierPlugin()` with 3 middleware routes

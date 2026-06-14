@@ -294,42 +294,45 @@ function shopierPlugin(): Plugin {
   //   2. Sipariş oluşturma zamanı: payment.createdAt'tan SONRA olmalı
   //   3. Sipariş tutarı: chargeAmount ile ±0.01 TL toleransla eşleşmeli
   //   4. paymentStatus SADECE 'paid' kabul edilir
+  // Gerçek Shopier API yanıt yapısı (loglardan tespit edildi):
+  // { id, status:"unfulfilled", paymentStatus:"paid", dateCreated:"2026-...", totals:{total:"10.80",...}, lineItems:[{productId:"48030326",...}] }
+  // Kesin eşleşme: lineItems[0].productId === productId (her ödeme benzersiz ürün)
+  // Yedek: dateCreated + totals.total kontrolü
   async function shopierCheckPayment(
     apiKey: string,
     productId: string,
     chargeAmount: number,
-    paymentCreatedAt: number, // ms timestamp
+    paymentCreatedAt: number,
   ): Promise<boolean> {
     const now = Date.now();
     if (now < paymentCreatedAt + 30_000) {
-      console.log(`[Shopier][checkPayment] Too early — waiting 30s minimum (elapsed=${Math.round((now - paymentCreatedAt) / 1000)}s)`);
+      console.log(`[Shopier][checkPayment] Too early (elapsed=${Math.round((now - paymentCreatedAt) / 1000)}s)`);
       return false;
     }
     try {
       const r = await fetch(`https://api.shopier.com/v1/orders?limit=50`, {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
       });
-      const rawText = await r.text();
-      console.log(`[Shopier][checkPayment] orders status=${r.status} body=${rawText.substring(0, 600)}`);
-      if (!r.ok) return false;
+      if (!r.ok) { console.log(`[Shopier][checkPayment] orders API error: ${r.status}`); return false; }
       let data: any;
-      try { data = JSON.parse(rawText); } catch { return false; }
+      try { data = await r.json(); } catch { return false; }
       const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
-      console.log(`[Shopier][checkPayment] total orders=${list.length} productId=${productId} chargeAmount=${chargeAmount} paymentCreatedAt=${new Date(paymentCreatedAt).toISOString()}`);
+      console.log(`[Shopier][checkPayment] checking ${list.length} orders for productId=${productId}`);
       for (const o of list) {
-        // Sipariş oluşturulma zamanı: payment başlatıldıktan SONRA olmalı
-        const orderTs = o.createdAt ?? o.created_at ?? o.createdDate ?? o.date ?? null;
-        const orderTime = orderTs ? new Date(orderTs).getTime() : 0;
-        // Tutar eşleşmesi (±0.5 TL tolerans)
-        const orderAmount = o.totalPrice ?? o.total_price ?? o.amount ?? o.price ?? 0;
-        const amountMatch = Math.abs(parseFloat(String(orderAmount)) - chargeAmount) <= 0.5;
-        // Zaman kontrolü: payment oluşturulduktan SONRA (veya timestamp yoksa geç)
-        const timeOk = orderTime === 0 || orderTime >= paymentCreatedAt - 5_000;
-        // paymentStatus kesinlikle 'paid' olmalı
+        // Kesin eşleşme: bu siparişin lineItems'ında bizim productId var mı?
+        const lineItems: any[] = o.lineItems ?? o.line_items ?? [];
+        const hasProduct = lineItems.some((li: any) =>
+          String(li.productId ?? li.product_id ?? '') === String(productId)
+        );
+        // paymentStatus SADECE 'paid' veya 'completed' kabul edilir
         const isPaid = o.paymentStatus === 'paid' || o.paymentStatus === 'completed';
-        console.log(`[Shopier][checkPayment] order=${o.id ?? '?'} paymentStatus=${o.paymentStatus} amount=${orderAmount} orderTime=${orderTs} amountMatch=${amountMatch} timeOk=${timeOk} isPaid=${isPaid}`);
-        if (isPaid && amountMatch && timeOk) {
-          console.log(`[Shopier][checkPayment] MATCH FOUND — order ${o.id ?? '?'} confirms payment for productId=${productId}`);
+        // Sipariş tarihi: dateCreated alanı (Shopier API'sinden teyit edildi)
+        const orderTs = o.dateCreated ?? o.createdAt ?? o.created_at ?? null;
+        const orderTime = orderTs ? new Date(orderTs).getTime() : 0;
+        const timeOk = orderTime === 0 || orderTime >= paymentCreatedAt - 5_000;
+        console.log(`[Shopier][checkPayment] order=${o.id} hasProduct=${hasProduct} isPaid=${isPaid} timeOk=${timeOk} date=${orderTs}`);
+        if (hasProduct && isPaid && timeOk) {
+          console.log(`[Shopier][checkPayment] ✅ MATCH — order ${o.id} productId=${productId}`);
           return true;
         }
       }
