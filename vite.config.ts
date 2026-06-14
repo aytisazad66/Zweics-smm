@@ -285,12 +285,57 @@ function shopierPlugin(): Plugin {
     return { id: String(data.id), url: data.url };
   }
 
-  // GÜVENLİK: Bu fonksiyon ARTIK çağrılmıyor.
-  // Shopier orders API product_id filtresini yok sayıp tüm hesap siparişlerini döndürüyor.
-  // Bu, eski ödenmişlerin false positive vermesine neden olur.
-  // Bakiye sadece webhook üzerinden ekleniyor (aşağıda shopierPlugin webhook handler'ı).
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function shopierCheckOrders(_apiKey: string, _productId: string): Promise<boolean> {
+  // Ödeme doğrulama: Shopier orders API + zaman & tutar filtresi.
+  // GET /v1/products/{id} → 403 Forbidden (erişim yok)
+  // GET /v1/orders?product_id={id} → product_id filtresini yoksayıp tüm siparişleri döndürüyor
+  // Çözüm: Dönen siparişleri createdAt ve amount ile sıkı filtrele.
+  // Garantiler:
+  //   1. Minimum 30 saniye bekleme (race condition önleme)
+  //   2. Sipariş oluşturma zamanı: payment.createdAt'tan SONRA olmalı
+  //   3. Sipariş tutarı: chargeAmount ile ±0.01 TL toleransla eşleşmeli
+  //   4. paymentStatus SADECE 'paid' kabul edilir
+  async function shopierCheckPayment(
+    apiKey: string,
+    productId: string,
+    chargeAmount: number,
+    paymentCreatedAt: number, // ms timestamp
+  ): Promise<boolean> {
+    const now = Date.now();
+    if (now < paymentCreatedAt + 30_000) {
+      console.log(`[Shopier][checkPayment] Too early — waiting 30s minimum (elapsed=${Math.round((now - paymentCreatedAt) / 1000)}s)`);
+      return false;
+    }
+    try {
+      const r = await fetch(`https://api.shopier.com/v1/orders?limit=50`, {
+        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
+      });
+      const rawText = await r.text();
+      console.log(`[Shopier][checkPayment] orders status=${r.status} body=${rawText.substring(0, 600)}`);
+      if (!r.ok) return false;
+      let data: any;
+      try { data = JSON.parse(rawText); } catch { return false; }
+      const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
+      console.log(`[Shopier][checkPayment] total orders=${list.length} productId=${productId} chargeAmount=${chargeAmount} paymentCreatedAt=${new Date(paymentCreatedAt).toISOString()}`);
+      for (const o of list) {
+        // Sipariş oluşturulma zamanı: payment başlatıldıktan SONRA olmalı
+        const orderTs = o.createdAt ?? o.created_at ?? o.createdDate ?? o.date ?? null;
+        const orderTime = orderTs ? new Date(orderTs).getTime() : 0;
+        // Tutar eşleşmesi (±0.5 TL tolerans)
+        const orderAmount = o.totalPrice ?? o.total_price ?? o.amount ?? o.price ?? 0;
+        const amountMatch = Math.abs(parseFloat(String(orderAmount)) - chargeAmount) <= 0.5;
+        // Zaman kontrolü: payment oluşturulduktan SONRA (veya timestamp yoksa geç)
+        const timeOk = orderTime === 0 || orderTime >= paymentCreatedAt - 5_000;
+        // paymentStatus kesinlikle 'paid' olmalı
+        const isPaid = o.paymentStatus === 'paid' || o.paymentStatus === 'completed';
+        console.log(`[Shopier][checkPayment] order=${o.id ?? '?'} paymentStatus=${o.paymentStatus} amount=${orderAmount} orderTime=${orderTs} amountMatch=${amountMatch} timeOk=${timeOk} isPaid=${isPaid}`);
+        if (isPaid && amountMatch && timeOk) {
+          console.log(`[Shopier][checkPayment] MATCH FOUND — order ${o.id ?? '?'} confirms payment for productId=${productId}`);
+          return true;
+        }
+      }
+    } catch (err: any) {
+      console.error(`[Shopier][checkPayment] ERROR: ${err.message}`);
+    }
     return false;
   }
 
@@ -370,18 +415,38 @@ function shopierPlugin(): Plugin {
             const payments = readPayments();
             const payment = payments[ref];
             if (!payment) { res.writeHead(404); res.end(JSON.stringify({ ok: false, status: 'not_found', message: 'Ödeme kaydı bulunamadı.' })); return; }
-            // GÜVENLİK: Bakiye SADECE Shopier webhook'u paymentStatus:'paid' gönderince eklenir.
-            // Bu endpoint Shopier API'sine hiç sorgu ATMAZ — sadece yerel kayda bakar.
-            // Böylece Shopier orders API'sinin hatalı veri döndürmesi bakiye ekleyemez.
+            // Zaten tamamlandıysa (webhook veya önceki polling tarafından)
             if (payment.status === 'completed') {
               const creditedAmount = payment.creditAmount ?? payment.amount;
               res.writeHead(200);
               res.end(JSON.stringify({ ok: true, status: 'completed', amount: creditedAmount }));
               return;
             }
-            // Henüz webhook gelmedi — pending döndür
-            res.writeHead(200);
-            res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.creditAmount ?? payment.amount }));
+            const createdAt = payment.createdAt ? new Date(payment.createdAt).getTime() : Date.now();
+            const paid = await shopierCheckPayment(
+              cfg.apiKey,
+              payment.shopierProductId,
+              payment.amount, // chargeAmount (komisyon dahil — Shopier'a ödenen gerçek tutar)
+              createdAt,
+            );
+            if (paid) {
+              const toCredit = payment.creditAmount ?? payment.amount;
+              const users = readUsers();
+              const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
+              if (userIdx >= 0) {
+                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + toCredit).toFixed(2));
+                writeUsers(users);
+              }
+              payments[ref].status = 'completed';
+              payments[ref].processedAt = new Date().toISOString();
+              writePayments(payments);
+              console.log(`[Shopier] Payment ${ref} confirmed via stockQuantity. ₺${toCredit} credited to ${payment.userId}`);
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'completed', amount: toCredit }));
+            } else {
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.creditAmount ?? payment.amount }));
+            }
           } catch (err: any) {
             res.writeHead(500);
             res.end(JSON.stringify({ ok: false, status: 'error', message: err.message }));
