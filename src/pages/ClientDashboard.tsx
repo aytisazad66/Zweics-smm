@@ -223,9 +223,26 @@ export const ClientDashboard: React.FC = () => {
   const [apiIpWhitelist, setApiIpWhitelist] = useState<string>('82.156.91.240, 195.12.80.3');
   const [twoFactorTokenSimulated, setTwoFactorTokenSimulated] = useState<boolean>(false);
 
+  // Platform names that should never appear in another platform's service list
+  const FOREIGN_PLATFORM_NAMES = [
+    'Facebook', 'Discord', 'LinkedIn', 'Pinterest', 'Reddit',
+    'Twitch', 'Bluesky', 'SoundCloud', 'Snapchat', 'WhatsApp',
+    'Kick', 'Likee', 'Medium', 'GitHub', 'Square',
+  ];
+
   // Calculate filtered services for order tab
+  // Also removes cross-platform contamination by name (e.g. Facebook services filed under Instagram)
   const servicesOfPlatform = useMemo(() => {
-    return services.filter(s => s.status === 'active' && s.platform === orderPlatform);
+    const otherSmm = ['Instagram','TikTok','YouTube','Twitter','Spotify','Telegram'].filter(p => p !== orderPlatform);
+    return services.filter(s => {
+      if (s.status !== 'active' || s.platform !== orderPlatform) return false;
+      const nameLower = s.name.toLowerCase();
+      // Drop services whose name belongs to a completely foreign platform
+      if (FOREIGN_PLATFORM_NAMES.some(kw => nameLower.includes(kw.toLowerCase()))) return false;
+      // Drop services whose name clearly belongs to a different SMM platform
+      if (otherSmm.some(p => nameLower.includes(p.toLowerCase()))) return false;
+      return true;
+    });
   }, [services, orderPlatform]);
 
   // Maps raw TürkPaneli category names → clean display category
