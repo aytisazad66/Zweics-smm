@@ -228,6 +228,23 @@ export const ClientDashboard: React.FC = () => {
     return services.filter(s => s.status === 'active' && s.platform === orderPlatform);
   }, [services, orderPlatform]);
 
+  // Group services by category, each group sorted cheapest → most expensive
+  const groupedServicesForPicker = useMemo(() => {
+    const searchLower = servicePickerSearch.toLowerCase();
+    const filtered = servicesOfPlatform.filter(
+      s => s.name.toLowerCase().includes(searchLower) || s.category.toLowerCase().includes(searchLower)
+    );
+    const map: Record<string, typeof filtered> = {};
+    for (const s of filtered) {
+      if (!map[s.category]) map[s.category] = [];
+      map[s.category].push(s);
+    }
+    for (const cat of Object.keys(map)) {
+      map[cat].sort((a, b) => a.pricePer1000 - b.pricePer1000);
+    }
+    return map;
+  }, [servicesOfPlatform, servicePickerSearch]);
+
   // Sync service selection when active platform changes
   useEffect(() => {
     if (servicesOfPlatform.length > 0) {
@@ -1473,59 +1490,76 @@ export const ClientDashboard: React.FC = () => {
                             </div>
                           </div>
 
-                          {/* Service Cards List */}
-                          <div className="overflow-y-auto flex-1 p-3 space-y-2">
-                            {servicesOfPlatform
-                              .filter(s => s.name.toLowerCase().includes(servicePickerSearch.toLowerCase()) || s.category.toLowerCase().includes(servicePickerSearch.toLowerCase()))
-                              .map((serv, idx) => {
-                                const isSelected = serv.id === selectedServiceId;
-                                return (
-                                  <button
-                                    key={serv.id}
-                                    type="button"
-                                    onClick={() => { setSelectedServiceId(serv.id); setServicePickerOpen(false); }}
-                                    className={`w-full text-left p-3.5 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
-                                      isSelected
-                                        ? 'bg-cyan-950/40 border-cyan-400/50 shadow-sm shadow-cyan-400/10'
-                                        : 'bg-white/2 border-white/5 hover:bg-white/5 hover:border-white/10'
-                                    }`}
-                                  >
-                                    <div className="flex-1 min-w-0 space-y-1.5">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-cyan-400/20 text-cyan-300' : 'bg-white/5 text-gray-500'}`}>
-                                          #{idx + 1}
-                                        </span>
-                                        <span className="text-[9px] font-bold bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded-md">{serv.category}</span>
-                                      </div>
-                                      <p className={`text-xs font-semibold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>{serv.name}</p>
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[10px] text-gray-500 font-mono">Min {serv.min} — Max {serv.max}</span>
-                                        {getServiceSpeed(serv) && (
-                                          <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
-                                            <Timer className="w-2.5 h-2.5" />{getServiceSpeed(serv)}
-                                          </span>
-                                        )}
-                                        {serv.deliveryInterval && (
-                                          <span className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold">
-                                            <RefreshCw className="w-2 h-2" />{serv.deliveryInterval}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <div className="text-right shrink-0">
-                                      <span className="text-sm font-extrabold font-mono text-cyan-400 block">₺{serv.pricePer1000.toFixed(2)}</span>
-                                      <span className="text-[9px] text-gray-600">/ 1000</span>
-                                      {isSelected && (
-                                        <div className="mt-1.5 w-5 h-5 rounded-full bg-cyan-400 flex items-center justify-center ml-auto">
-                                          <CheckCircle className="w-3 h-3 text-black" />
-                                        </div>
-                                      )}
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            {servicesOfPlatform.filter(s => s.name.toLowerCase().includes(servicePickerSearch.toLowerCase()) || s.category.toLowerCase().includes(servicePickerSearch.toLowerCase())).length === 0 && (
+                          {/* Service Cards List — grouped by category, sorted cheap→expensive */}
+                          <div className="overflow-y-auto flex-1 p-3 space-y-4">
+                            {Object.keys(groupedServicesForPicker).length === 0 ? (
                               <p className="text-center text-gray-600 text-xs py-8">{currentLanguage === 'TR' ? 'Sonuç bulunamadı.' : 'No results found.'}</p>
+                            ) : (
+                              Object.entries(groupedServicesForPicker).map(([category, catServices]) => (
+                                <div key={category}>
+                                  {/* Category Header */}
+                                  <div className="flex items-center gap-2 mb-2 px-1">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2.5 py-1 rounded-lg">
+                                      {category}
+                                    </span>
+                                    <span className="text-[9px] text-gray-600 font-mono">{catServices.length} servis</span>
+                                    <div className="flex-1 h-px bg-white/5" />
+                                    <span className="text-[9px] text-gray-600 flex items-center gap-1">
+                                      ↑ ucuzdan pahalıya
+                                    </span>
+                                  </div>
+
+                                  {/* Services in this category */}
+                                  <div className="space-y-1.5">
+                                    {catServices.map((serv, idx) => {
+                                      const isSelected = serv.id === selectedServiceId;
+                                      return (
+                                        <button
+                                          key={serv.id}
+                                          type="button"
+                                          onClick={() => { setSelectedServiceId(serv.id); setServicePickerOpen(false); }}
+                                          className={`w-full text-left p-3.5 rounded-2xl border transition cursor-pointer flex items-start justify-between gap-3 ${
+                                            isSelected
+                                              ? 'bg-cyan-950/40 border-cyan-400/50 shadow-sm shadow-cyan-400/10'
+                                              : 'bg-white/2 border-white/5 hover:bg-white/5 hover:border-white/10'
+                                          }`}
+                                        >
+                                          <div className="flex-1 min-w-0 space-y-1.5">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md ${isSelected ? 'bg-cyan-400/20 text-cyan-300' : 'bg-white/5 text-gray-500'}`}>
+                                                #{idx + 1}
+                                              </span>
+                                            </div>
+                                            <p className={`text-xs font-semibold leading-snug ${isSelected ? 'text-white' : 'text-gray-200'}`}>{serv.name}</p>
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                              <span className="text-[10px] text-gray-500 font-mono">Min {serv.min} — Max {serv.max}</span>
+                                              {getServiceSpeed(serv) && (
+                                                <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                                                  <Timer className="w-2.5 h-2.5" />{getServiceSpeed(serv)}
+                                                </span>
+                                              )}
+                                              {serv.deliveryInterval && (
+                                                <span className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold">
+                                                  <RefreshCw className="w-2 h-2" />{serv.deliveryInterval}
+                                                </span>
+                                              )}
+                                            </div>
+                                          </div>
+                                          <div className="text-right shrink-0">
+                                            <span className="text-sm font-extrabold font-mono text-cyan-400 block">₺{serv.pricePer1000.toFixed(2)}</span>
+                                            <span className="text-[9px] text-gray-600">/ 1000</span>
+                                            {isSelected && (
+                                              <div className="mt-1.5 w-5 h-5 rounded-full bg-cyan-400 flex items-center justify-center ml-auto">
+                                                <CheckCircle className="w-3 h-3 text-black" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))
                             )}
                           </div>
                         </div>
