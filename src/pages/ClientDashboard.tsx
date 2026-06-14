@@ -513,7 +513,7 @@ export const ClientDashboard: React.FC = () => {
     }
     const pollRef = shopierModal.ref;
     let pollCount = 0;
-    const MAX_POLLS = 40; // 40 × 3s = 2 dakika
+    const MAX_POLLS = 600; // 600 × 3s = 30 dakika
 
     const checkPayment = async () => {
       pollCount++;
