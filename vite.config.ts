@@ -333,16 +333,19 @@ function shopierPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, message: 'Shopier entegrasyonu aktif değil.' }));
               return;
             }
-            const { amount, userId, userName, userEmail } = JSON.parse(body);
-            const numAmount = parseFloat(amount);
-            if (isNaN(numAmount) || numAmount < 10 || numAmount > 5000) {
+            const { chargeAmount, creditAmount, amount, userId, userName, userEmail } = JSON.parse(body);
+            // chargeAmount = müşteriden alınan tutar (komisyon dahil)
+            // creditAmount = bakiyeye eklenecek tutar (komisyonsuz)
+            const numCharge = parseFloat(chargeAmount ?? amount);
+            const numCredit = parseFloat(creditAmount ?? amount);
+            if (isNaN(numCharge) || numCharge < 10 || numCharge > 6000) {
               res.writeHead(400);
-              res.end(JSON.stringify({ ok: false, message: 'Tutar 10 TL ile 5.000 TL arasında olmalıdır.' }));
+              res.end(JSON.stringify({ ok: false, message: 'Tutar geçersiz.' }));
               return;
             }
             const ref = generateRef();
-            const title = `Bakiye Yüklemesi - ${numAmount.toFixed(2)} TL`;
-            const product = await shopierCreateProduct(cfg.apiKey, title, numAmount, cfg.productImageUrl || 'https://cdn.pixabay.com/photo/2020/05/18/16/17/social-media-5187243_1280.png', userName);
+            const title = `Bakiye Yüklemesi - ${numCredit.toFixed(2)} TL`;
+            const product = await shopierCreateProduct(cfg.apiKey, title, numCharge, cfg.productImageUrl || 'https://cdn.pixabay.com/photo/2020/05/18/16/17/social-media-5187243_1280.png', userName);
             if (!product) {
               res.writeHead(502);
               res.end(JSON.stringify({ ok: false, message: 'Shopier ürün oluşturulamadı. Lütfen tekrar deneyin.' }));
@@ -353,13 +356,14 @@ function shopierPlugin(): Plugin {
               shopierProductId: product.id,
               shopierProductUrl: product.url,
               userId, userName, userEmail,
-              amount: numAmount,
+              amount: numCharge,
+              creditAmount: numCredit,
               status: 'pending',
               createdAt: new Date().toISOString(),
               processedAt: null,
             };
             writePayments(payments);
-            console.log(`[Shopier] Created product ${product.id} for ${userId} | ₺${numAmount} | ref=${ref}`);
+            console.log(`[Shopier] Created product ${product.id} for ${userId} | charge=₺${numCharge} credit=₺${numCredit} | ref=${ref}`);
             res.writeHead(200);
             res.end(JSON.stringify({ ok: true, url: product.url, ref }));
           } catch (err: any) {
@@ -393,20 +397,21 @@ function shopierPlugin(): Plugin {
             }
             const paid = await shopierCheckOrders(cfg.apiKey, payment.shopierProductId);
             if (paid) {
-              // Add balance to user
+              // Add balance to user — use creditAmount (komisyonsuz) if present
+              const toCredit = payment.creditAmount ?? payment.amount;
               const users = readUsers();
               const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
               if (userIdx >= 0) {
-                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + payment.amount).toFixed(2));
+                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + toCredit).toFixed(2));
                 writeUsers(users);
               }
               // Mark payment as completed
               payments[ref].status = 'completed';
               payments[ref].processedAt = new Date().toISOString();
               writePayments(payments);
-              console.log(`[Shopier] Payment ${ref} confirmed. ₺${payment.amount} added to ${payment.userId}`);
+              console.log(`[Shopier] Payment ${ref} confirmed. ₺${toCredit} credited to ${payment.userId}`);
               res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'completed', amount: payment.amount }));
+              res.end(JSON.stringify({ ok: true, status: 'completed', amount: toCredit }));
             } else {
               res.writeHead(200);
               res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.amount }));
@@ -456,16 +461,17 @@ function shopierPlugin(): Plugin {
             const paid = webhookPaid || await shopierCheckOrders(cfg.apiKey, productId);
 
             if (paid) {
+              const toCredit = payment.creditAmount ?? payment.amount;
               const users = readUsers();
               const userIdx = users.findIndex((u: any) => u.id === payment.userId || u.email === payment.userId);
               if (userIdx >= 0) {
-                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + payment.amount).toFixed(2));
+                users[userIdx].balance = parseFloat(((users[userIdx].balance || 0) + toCredit).toFixed(2));
                 writeUsers(users);
               }
               payments[ref].status = 'completed';
               payments[ref].processedAt = new Date().toISOString();
               writePayments(payments);
-              console.log(`[Shopier] Webhook: ₺${payment.amount} credited to ${payment.userId} (ref=${ref})`);
+              console.log(`[Shopier] Webhook: ₺${toCredit} credited to ${payment.userId} (ref=${ref})`);
             }
             res.writeHead(200);
             res.end('ok');

@@ -470,19 +470,23 @@ export const ClientDashboard: React.FC = () => {
     }
   };
 
+  const SHOPIER_COMMISSION_RATE = 0.08;
+
   const handleShopierPay = async () => {
-    const val = parseFloat(depositAmount);
-    if (isNaN(val) || val < 10 || val > 5000) {
+    const creditAmount = parseFloat(depositAmount);
+    if (isNaN(creditAmount) || creditAmount < 10 || creditAmount > 5000) {
       showToast(currentLanguage === 'TR' ? 'Tutar 10 TL ile 5.000 TL arasında olmalıdır.' : 'Amount must be between 10 and 5000 TRY.', 'error');
       return;
     }
+    const chargeAmount = parseFloat((creditAmount * (1 + SHOPIER_COMMISSION_RATE)).toFixed(2));
     setShopierLoading(true);
     try {
       const resp = await fetch('/api/shopier/create-product', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: val,
+          chargeAmount,
+          creditAmount,
           userId: currentClientUser?.id || currentClientUser?.email || '',
           userName: currentClientUser?.fullName || '',
           userEmail: currentClientUser?.email || '',
@@ -490,12 +494,11 @@ export const ClientDashboard: React.FC = () => {
       });
       const data = await resp.json();
       if (data.ok && data.url) {
-        // Save ref to localStorage so ShopierSuccess page (new tab) can find it
         localStorage.setItem('shopier_pending_ref', data.ref);
-        localStorage.setItem('shopier_pending_amount', String(val));
-        // Open Shopier payment page in a new tab - panel stays open for auto-detection
+        localStorage.setItem('shopier_pending_amount', String(creditAmount));
         window.open(data.url, '_blank', 'noopener');
-        setShopierModal({ ref: data.ref, url: data.url, amount: val, status: 'waiting' });
+        // Modal shows creditAmount (bakiyeye eklenecek)
+        setShopierModal({ ref: data.ref, url: data.url, amount: creditAmount, status: 'waiting' });
       } else {
         showToast(data.message || (currentLanguage === 'TR' ? 'Shopier bağlantısı kurulamadı.' : 'Could not connect to Shopier.'), 'error');
       }
@@ -1955,6 +1958,36 @@ export const ClientDashboard: React.FC = () => {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Ödeme Yöntemi Seç' : 'Deposit Method'}</label>
                     <div className="grid grid-cols-1 gap-2">
+
+                      {/* Shopier — kredi kartı, listenin en üstünde */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPaymentMethodId('shopier')}
+                        className={`p-3.5 rounded-2xl flex items-center justify-between font-bold border text-left transition cursor-pointer ${
+                          selectedPaymentMethodId === 'shopier'
+                            ? 'bg-orange-950/40 border-orange-400 text-white'
+                            : 'bg-white/2 border-white/5 text-gray-400 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <svg className="w-4 h-4 text-orange-400 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                          </svg>
+                          <div>
+                            <span className="block font-extrabold text-sm text-slate-100">
+                              {currentLanguage === 'TR' ? 'Shopier — Kredi / Banka Kartı' : 'Shopier — Credit / Debit Card'}
+                            </span>
+                            <span className="text-[10px] text-orange-400/80 font-bold block uppercase mt-0.5">
+                              {currentLanguage === 'TR' ? 'ANLIK • KOMİSYON: %8 • MİN: 10 ₺' : 'INSTANT • COMMISSION: 8% • MIN: 10 ₺'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 ${selectedPaymentMethodId === 'shopier' ? 'border-orange-400' : 'border-gray-700'}`}>
+                          {selectedPaymentMethodId === 'shopier' && <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />}
+                        </div>
+                      </button>
+
+                      {/* Diğer ödeme yöntemleri */}
                       {paymentMethods.map(m => (
                         <button
                           key={m.id}
@@ -1978,7 +2011,8 @@ export const ClientDashboard: React.FC = () => {
                         </button>
                       ))}
                     </div>
-                    {/* Payment instructions box — shown when method has instructions */}
+
+                    {/* Payment instructions box — shown when non-shopier method has instructions */}
                     {(() => {
                       const selMethod = paymentMethods.find(m => m.id === selectedPaymentMethodId);
                       return selMethod?.instructions ? (
@@ -2007,53 +2041,67 @@ export const ClientDashboard: React.FC = () => {
                     </div>
                   </div>
 
-                  <button
-                    id="client-deposit-submit-btn"
-                    type="submit"
-                    className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-600 text-white hover:text-black font-extrabold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
-                  >
-                    <BanknoteIcon className="w-4 h-4 text-slate-100" />
-                    <span>{currentLanguage === 'TR' ? 'Ödeme Talebi Oluştur' : 'Create Payment Request'}</span>
-                  </button>
+                  {/* Shopier komisyon özeti */}
+                  {selectedPaymentMethodId === 'shopier' && (() => {
+                    const credit = parseFloat(depositAmount) || 0;
+                    const commission = parseFloat((credit * SHOPIER_COMMISSION_RATE).toFixed(2));
+                    const charge = parseFloat((credit * (1 + SHOPIER_COMMISSION_RATE)).toFixed(2));
+                    return credit > 0 ? (
+                      <div className="p-3.5 bg-orange-950/20 border border-orange-500/20 rounded-2xl space-y-1.5 text-xs">
+                        <div className="flex justify-between text-gray-400">
+                          <span>{currentLanguage === 'TR' ? 'Bakiyenize eklenecek' : 'Balance to credit'}</span>
+                          <span className="font-bold text-white font-mono">₺{credit.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between text-gray-400">
+                          <span>{currentLanguage === 'TR' ? 'Shopier komisyonu (%8)' : 'Shopier fee (8%)'}</span>
+                          <span className="font-bold text-orange-400 font-mono">+ ₺{commission.toFixed(2)}</span>
+                        </div>
+                        <div className="h-px bg-white/5" />
+                        <div className="flex justify-between">
+                          <span className="font-bold text-white">{currentLanguage === 'TR' ? 'Ödenecek toplam' : 'Total to pay'}</span>
+                          <span className="font-black text-orange-400 font-mono text-sm">₺{charge.toFixed(2)}</span>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+
+                  {/* Buton: Shopier seçiliyse turuncu, değilse gradient */}
+                  {selectedPaymentMethodId === 'shopier' ? (
+                    <button
+                      type="button"
+                      onClick={handleShopierPay}
+                      disabled={shopierLoading}
+                      className="w-full py-3.5 bg-[#FF6000] hover:bg-[#e55500] disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold rounded-xl shadow-lg hover:shadow-orange-500/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {shopierLoading ? (
+                        <>
+                          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                          </svg>
+                          <span>{currentLanguage === 'TR' ? 'Ödeme Sayfası Hazırlanıyor...' : 'Preparing Payment Page...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
+                          </svg>
+                          <span>{currentLanguage === 'TR' ? 'Shopier ile Kredi Kartıyla Öde' : 'Pay with Card via Shopier'}</span>
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      id="client-deposit-submit-btn"
+                      type="submit"
+                      className="w-full py-3.5 bg-gradient-to-r from-cyan-400 to-purple-600 text-white hover:text-black font-extrabold rounded-xl shadow-lg hover:shadow-cyan-400/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <BanknoteIcon className="w-4 h-4 text-slate-100" />
+                      <span>{currentLanguage === 'TR' ? 'Ödeme Talebi Oluştur' : 'Create Payment Request'}</span>
+                    </button>
+                  )}
 
                 </form>
-
-                {/* Shopier instant payment separator */}
-                <div className="flex items-center gap-3 py-1">
-                  <div className="flex-1 h-px bg-white/5" />
-                  <span className="text-[10px] text-gray-600 font-bold uppercase tracking-wider">veya anlık öde</span>
-                  <div className="flex-1 h-px bg-white/5" />
-                </div>
-
-                {/* Shopier instant pay button */}
-                <button
-                  type="button"
-                  onClick={handleShopierPay}
-                  disabled={shopierLoading}
-                  className="w-full py-3.5 bg-[#FF6000] hover:bg-[#e55500] disabled:opacity-60 disabled:cursor-not-allowed text-white font-extrabold rounded-xl shadow-lg hover:shadow-orange-500/20 active:scale-95 transition-all duration-200 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  {shopierLoading ? (
-                    <>
-                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                      </svg>
-                      <span>{currentLanguage === 'TR' ? 'Ödeme Sayfası Hazırlanıyor...' : 'Preparing Payment Page...'}</span>
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M20 4H4c-1.11 0-2 .89-2 2v12c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 14H4v-6h16v6zm0-10H4V6h16v2z"/>
-                      </svg>
-                      <span>{currentLanguage === 'TR' ? 'Shopier ile Kredi Kartıyla Öde' : 'Pay Instantly with Shopier'}</span>
-                    </>
-                  )}
-                </button>
-                <p className="text-[10px] text-gray-600 text-center">
-                  {currentLanguage === 'TR'
-                    ? '🔒 Shopier güvenli ödeme altyapısı • Kredi/Banka Kartı • Anlık bakiye yükleme'
-                    : '🔒 Secure Shopier payment • Credit/Debit Card • Instant balance top-up'}
-                </p>
               </div>
 
               {/* Deposit transactions logger */}
