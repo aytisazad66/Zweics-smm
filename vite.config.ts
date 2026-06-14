@@ -365,8 +365,6 @@ function shopierPlugin(): Plugin {
               return;
             }
             const { chargeAmount, creditAmount, amount, userId, userName, userEmail } = JSON.parse(body);
-            // chargeAmount = müşteriden alınan tutar (komisyon dahil)
-            // creditAmount = bakiyeye eklenecek tutar (komisyonsuz)
             const numCharge = parseFloat(chargeAmount ?? amount);
             const numCredit = parseFloat(creditAmount ?? amount);
             if (isNaN(numCharge) || numCharge < 10 || numCharge > 6000) {
@@ -374,6 +372,31 @@ function shopierPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, message: 'Tutar geçersiz.' }));
               return;
             }
+
+            const payments = readPayments();
+
+            // Aynı kullanıcı için aynı tutarda son 2 saat içinde bekleyen ürün varsa yeniden kullan.
+            // Böylece Shopier'a gereksiz ürün spam yapılmaz.
+            const TWO_HOURS = 2 * 60 * 60 * 1000;
+            const existingRef = Object.keys(payments).find(k => {
+              const p = payments[k];
+              return (
+                p.status === 'pending' &&
+                p.userId === userId &&
+                Math.abs(p.amount - numCharge) < 0.01 &&
+                p.shopierProductUrl &&
+                (Date.now() - new Date(p.createdAt).getTime()) < TWO_HOURS
+              );
+            });
+
+            if (existingRef) {
+              const existing = payments[existingRef];
+              console.log(`[Shopier] Reusing existing product ${existing.shopierProductId} for ${userId} | ref=${existingRef}`);
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, url: existing.shopierProductUrl, ref: existingRef }));
+              return;
+            }
+
             const ref = generateRef();
             const title = `Bakiye Yüklemesi - ${numCredit.toFixed(2)} TL`;
             const product = await shopierCreateProduct(cfg.apiKey, title, numCharge, cfg.productImageUrl || 'https://cdn.pixabay.com/photo/2020/05/18/16/17/social-media-5187243_1280.png', userName);
@@ -382,7 +405,6 @@ function shopierPlugin(): Plugin {
               res.end(JSON.stringify({ ok: false, message: 'Shopier ürün oluşturulamadı. Lütfen tekrar deneyin.' }));
               return;
             }
-            const payments = readPayments();
             payments[ref] = {
               shopierProductId: product.id,
               shopierProductUrl: product.url,
@@ -394,7 +416,7 @@ function shopierPlugin(): Plugin {
               processedAt: null,
             };
             writePayments(payments);
-            console.log(`[Shopier] Created product ${product.id} for ${userId} | charge=₺${numCharge} credit=₺${numCredit} | ref=${ref}`);
+            console.log(`[Shopier] Created NEW product ${product.id} for ${userId} | charge=₺${numCharge} credit=₺${numCredit} | ref=${ref}`);
             res.writeHead(200);
             res.end(JSON.stringify({ ok: true, url: product.url, ref }));
           } catch (err: any) {
