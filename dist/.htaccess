@@ -2,34 +2,39 @@ Options -MultiViews
 RewriteEngine On
 RewriteBase /
 
-# PHP dosyalarını olduğu gibi sun — SPA fallback'e düşmesin
-RewriteRule ^api-proxy\.php$ - [L]
-RewriteRule ^api-kv\.php$ - [L]
-RewriteRule ^api-mail\.php$ - [L]
-RewriteRule ^api-auth\.php$ - [L]
+# PHP dosyalarını doğrudan sun — SPA fallback'e düşmesin
+RewriteRule ^api-proxy\.php$   - [L]
+RewriteRule ^api-kv\.php$      - [L]
+RewriteRule ^api-mail\.php$    - [L]
+RewriteRule ^api-auth\.php$    - [L]
 RewriteRule ^api-shopier\.php$ - [L]
 
-# /api/kv/{key} isteklerini PHP KV store'a yönlendir
+# /api/kv/{key} → KV store
 RewriteRule ^api/kv/([a-zA-Z0-9_]+)$ api-kv.php?key=$1 [L,QSA]
 
-# /api/mail isteklerini PHP mail'e yönlendir
+# /api/mail → PHP mailer
 RewriteRule ^api/mail$ api-mail.php [L,QSA]
 
-# /api/auth/* isteklerini PHP auth'a yönlendir
-RewriteRule ^api/auth/login$ api-auth.php?action=login [L,QSA]
+# /api/auth/* → PHP auth
+RewriteRule ^api/auth/login$           api-auth.php?action=login           [L,QSA]
 RewriteRule ^api/auth/set-credentials$ api-auth.php?action=set-credentials [L,QSA]
 
-# /api/shopier/* isteklerini PHP Shopier handler'a yönlendir
-RewriteRule ^api/shopier/create-product$ api-shopier.php/create-product [L,QSA]
-RewriteRule ^api/shopier/check-payment$ api-shopier.php/check-payment [L,QSA]
-RewriteRule ^api/shopier/webhook$ api-shopier.php/webhook [L,QSA]
+# /api/shopier/* → PHP Shopier handler
+RewriteRule ^api/shopier/create-product$   api-shopier.php/create-product   [L,QSA]
+RewriteRule ^api/shopier/check-payment$    api-shopier.php/check-payment    [L,QSA]
+RewriteRule ^api/shopier/webhook$          api-shopier.php/webhook          [L,QSA]
+RewriteRule ^api/shopier/admin-payments$   api-shopier.php/admin-payments   [L,QSA]
+RewriteRule ^api/shopier/register-webhook$ api-shopier.php/register-webhook [L,QSA]
 
-# SPA fallback — tüm diğer route'ları React'a gönder
+# SPA fallback — tüm diğer route'lar React'a gider
 RewriteRule ^index\.html$ - [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteCond %{REQUEST_FILENAME} !-l
 RewriteRule . /index.html [L]
+
+# data/ dizinine HTTP erişimini engelle (JSON dosyalarını koru)
+RewriteRule ^data/ - [F,L]
 
 <IfModule mod_headers.c>
   Header always set X-Content-Type-Options "nosniff"
@@ -42,9 +47,10 @@ RewriteRule . /index.html [L]
 
 <IfModule mod_expires.c>
   ExpiresActive On
-  ExpiresByType image/png "access plus 1 year"
-  ExpiresByType image/jpg "access plus 1 year"
-  ExpiresByType image/svg+xml "access plus 1 year"
-  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType image/png              "access plus 1 year"
+  ExpiresByType image/jpg              "access plus 1 year"
+  ExpiresByType image/jpeg             "access plus 1 year"
+  ExpiresByType image/svg+xml          "access plus 1 year"
+  ExpiresByType text/css               "access plus 1 month"
   ExpiresByType application/javascript "access plus 1 month"
 </IfModule>
