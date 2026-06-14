@@ -894,18 +894,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       let addedCount = 0;
       const newServices: Service[] = [];
+      const platformFixes: { id: string; platform: Service['platform'] }[] = [];
 
       selectedItems.forEach(item => {
         const serviceId = String(item.service ?? item.id ?? '');
-        const already = services.some(s => s.providerServiceId === Number(serviceId) && s.providerApiId === providerId);
-        if (already) return;
-
         const name = String(item.name ?? '');
         const category = String(item.category ?? item.type ?? 'Genel');
+        const platform = detectPlatformFromName(name, category);
+
+        // Check if already imported but with wrong platform — fix it silently
+        const existingService = services.find(s => s.providerServiceId === Number(serviceId) && s.providerApiId === providerId);
+        if (existingService) {
+          if (existingService.platform !== platform) {
+            platformFixes.push({ id: existingService.id, platform });
+          }
+          return;
+        }
+
         const rate = parseFloat(item.rate ?? '0');
         const min = parseInt(item.min ?? '100', 10);
         const max = parseInt(item.max ?? '10000', 10);
-        const platform = detectPlatformFromName(name, category);
 
         const markup = 1.3;
         const pricePer1000 = parseFloat((rate * markup).toFixed(2));
@@ -956,18 +964,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addedCount++;
       });
 
-      if (addedCount > 0) {
-        setServices(prev => [...prev, ...newServices]);
+      // Apply platform fixes for already-imported services with wrong platform
+      if (platformFixes.length > 0) {
+        setServices(prev => prev.map(s => {
+          const fix = platformFixes.find(f => f.id === s.id);
+          return fix ? { ...s, platform: fix.platform } : s;
+        }));
+      }
+
+      if (addedCount > 0 || platformFixes.length > 0) {
+        if (addedCount > 0) {
+          setServices(prev => [...prev, ...newServices]);
+        }
+        const fixMsg = platformFixes.length > 0
+          ? (currentLanguage === 'TR'
+              ? ` (${platformFixes.length} servisin platformu düzeltildi)`
+              : ` (${platformFixes.length} service platforms corrected)`)
+          : '';
         addNotification(
           currentLanguage === 'TR'
-            ? `${provider.name} kaynağından ${addedCount} yeni servis aktarıldı (her kategoriden en ucuz + en hızlı).`
-            : `${addedCount} services imported from ${provider.name} (cheapest + fastest per category).`,
+            ? `${provider.name} kaynağından ${addedCount} yeni servis aktarıldı.${fixMsg}`
+            : `${addedCount} services imported from ${provider.name}.${fixMsg}`,
           "service"
         );
         showToast(
           currentLanguage === 'TR'
-            ? `✅ ${addedCount} servis içe aktarıldı!`
-            : `✅ ${addedCount} services imported successfully!`,
+            ? `✅ ${addedCount} servis içe aktarıldı!${fixMsg}`
+            : `✅ ${addedCount} services imported!${fixMsg}`,
           "success"
         );
       } else {
