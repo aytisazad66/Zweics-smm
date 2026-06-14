@@ -56,7 +56,7 @@ export const LiveSupport: React.FC = () => {
           : 'You can toggle, edit on-the-fly or reorder SMM catalog listings under the Services sub-menu.';
       } else if (query.includes('api') || query.includes('key')) {
         replyText = currentLanguage === 'TR'
-          ? 'API Yönetimi sekmesi üzerinden harici servis sağlayıcıları ekleyebilir, API KEY düzenlemesi yapabilir ve bağlantıları her an test edebilirsiniz.'
+          ? 'API Yönetimi sekmesi üzerinden API KEY düzenlemesi yapabilir ve bağlantıları her an test edebilirsiniz.'
           : 'Under API Management, secure external key connections, update providers endpoints, and run diagnostic live tests.';
       } else if (query.includes('bakiye') || query.includes('ödeme') || query.includes('onay')) {
         replyText = currentLanguage === 'TR'

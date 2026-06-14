@@ -680,7 +680,7 @@ export const initialApiProviders: ApiProvider[] = [
 
 export const quickReplies = [
   "Merhaba, talebiniz ilgili teknik birime aktarıldı. En kısa sürede geri dönüş sağlanacaktır.",
-  "Merhaba, siparişiniz kontrol edildiğinde gönderimin devam ettiği görülmüştür. Tam süresi sağlayıcı yoğunluğuna göre değişebilmektedir.",
+  "Merhaba, siparişiniz kontrol edildiğinde gönderimin devam ettiği görülmüştür. Tam süresi sistem yoğunluğuna göre değişebilmektedir.",
   "Merhaba, verdiğiniz link hatalı veya gizli konumdadır. Lütfen gizlilik ayarlarını kontrol edip siparişi yeniden açınız.",
   "Merhaba, ödemeniz kontrol edilerek bakiye cüzdanınıza yansıtılmıştır. Keyifli alışverişler dileriz.",
   "Merhaba, düşen takipçiler için telafi butonu aktif edilerek siparişiniz tekrar gönderime alınmıştır."

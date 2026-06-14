@@ -756,9 +756,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         if (newStatus && newStatus !== order.status) {
           const logText = newStatus === 'Tamamlandı'
-            ? `✅ Sipariş tamamlandı. Sağlayıcı onayladı. (${result.status})`
+            ? `✅ Sipariş tamamlandı. (${result.status})`
             : newStatus === 'İptal'
-            ? `❌ Sipariş sağlayıcı tarafından iptal edildi. (${result.status})`
+            ? `❌ Sipariş iptal edildi. (${result.status})`
             : `🔄 Sipariş durumu güncellendi: ${result.status}`;
 
           setOrders(prev => prev.map(o => {
@@ -1126,7 +1126,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             setOrders(prev => [cancelledOrder, ...prev]);
             addNotification(
               isProviderBalanceError
-                ? `Servis geçici kullanım dışı: ${service.name.substring(0, 20)} (sağlayıcı bakiyesi yetersiz)`
+                ? `Servis geçici kullanım dışı: ${service.name.substring(0, 20)} — lütfen daha sonra tekrar deneyin`
                 : `Sipariş başarısız: ${service.name.substring(0, 20)}`,
               'error'
             );
