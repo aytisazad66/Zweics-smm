@@ -5,6 +5,11 @@
  * POST /api/kv/{key}  → JSON veri kaydeder
  */
 
+// Büyük servis listesi (1-2MB) yazabilmek için PHP limitlerini yükselt
+@ini_set('post_max_size',       '32M');
+@ini_set('upload_max_filesize', '32M');
+@ini_set('memory_limit',        '128M');
+
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 header('Cache-Control: no-store, no-cache');

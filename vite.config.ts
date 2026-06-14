@@ -758,21 +758,28 @@ function copyFilesAfterBuild(): Plugin {
           console.log(`[cPanel] Copied ${src} → ${dest}`);
         }
       }
-      // data/ klasörünü kopyala (Shopier config, kullanıcı verileri vb.)
+      // data/ klasörünü kopyala — yapılandırma + servis verileri
+      // Dahil edilmeyenler: smm_users, smm_orders, smm_tickets,
+      //   smm_payment_requests, smm_shopier_payments, smm_otp_* (gizlilik)
       const srcDataDir = path.resolve('./data');
       const destDataDir = path.resolve('./dist/data');
       if (fs.existsSync(srcDataDir)) {
         if (!fs.existsSync(destDataDir)) fs.mkdirSync(destDataDir, { recursive: true });
+        const EXCLUDE_PREFIXES = ['smm_otp_'];
+        const EXCLUDE_FILES = [
+          'smm_users.json',
+          'smm_orders.json',
+          'smm_tickets.json',
+          'smm_payment_requests.json',
+          'smm_shopier_payments.json',
+        ];
         for (const file of fs.readdirSync(srcDataDir)) {
-          // OTP geçici dosyalarını ve ödeme geçmişini dahil etme — sadece yapılandırma dosyaları
-          const include = [
-            'smm_shopier_config.json',
-            'smm_admin_credentials.json',
-          ];
-          if (include.includes(file)) {
-            fs.copyFileSync(path.join(srcDataDir, file), path.join(destDataDir, file));
-            console.log(`[cPanel] Copied data/${file} → dist/data/${file}`);
-          }
+          if (!file.endsWith('.json')) continue;
+          if (EXCLUDE_FILES.includes(file)) continue;
+          if (EXCLUDE_PREFIXES.some(p => file.startsWith(p))) continue;
+          fs.copyFileSync(path.join(srcDataDir, file), path.join(destDataDir, file));
+          const sizeKb = Math.round(fs.statSync(path.join(srcDataDir, file)).size / 1024);
+          console.log(`[cPanel] Copied data/${file} → dist/data/${file} (${sizeKb} KB)`);
         }
       }
     }
