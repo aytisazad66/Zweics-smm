@@ -12,7 +12,7 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
-define('KV_DIR', __DIR__ . '/kv_data');
+define('KV_DIR', __DIR__ . '/data');
 define('SHOPIER_API', 'https://api.shopier.com/v1');
 
 if (!is_dir(KV_DIR)) mkdir(KV_DIR, 0755, true);

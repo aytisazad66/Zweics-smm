@@ -125,18 +125,18 @@ export const ClientDashboard: React.FC = () => {
   // Unified Tab Management
   const [activeTab, setActiveTab] = useState<'dashboard' | 'new-order' | 'services' | 'my-orders' | 'add-funds' | 'tickets' | 'api-docs' | 'notifications'>('dashboard');
 
-  // Announcement popup — only shown once per unique message (persisted in localStorage)
+  // Announcement popup — only shown once per session (persisted in sessionStorage)
   const [showAnnouncementPopup, setShowAnnouncementPopup] = useState(false);
   useEffect(() => {
     if (!announcementText) return;
     const seenKey = 'bm_seen_announcement';
-    const alreadySeen = localStorage.getItem(seenKey) === announcementText;
+    const alreadySeen = sessionStorage.getItem(seenKey) === announcementText;
     if (!alreadySeen) {
       setShowAnnouncementPopup(true);
     }
   }, [announcementText]);
   const dismissAnnouncement = () => {
-    localStorage.setItem('bm_seen_announcement', announcementText);
+    sessionStorage.setItem('bm_seen_announcement', announcementText);
     setShowAnnouncementPopup(false);
   };
 
@@ -615,8 +615,7 @@ export const ClientDashboard: React.FC = () => {
       });
       const data = await resp.json();
       if (data.ok && data.url) {
-        localStorage.setItem('shopier_pending_ref', data.ref);
-        localStorage.setItem('shopier_pending_amount', String(creditAmount));
+        sessionStorage.setItem('shopier_pending_ref', data.ref);
         window.open(data.url, '_blank', 'noopener');
         // Modal shows creditAmount (bakiyeye eklenecek)
         setShopierModal({ ref: data.ref, url: data.url, amount: creditAmount, status: 'waiting' });
@@ -746,7 +745,7 @@ export const ClientDashboard: React.FC = () => {
           profile: {
             fullName: currentClientUser?.fullName,
             email: currentClientUser?.email,
-            reseller_level: "SECURE GOLD BAYİ"
+            membership_level: "ALTIN ÜYE"
           },
           api_key: randomSuccessToken
         });
@@ -1267,8 +1266,8 @@ export const ClientDashboard: React.FC = () => {
                     </h2>
                     <p className="text-gray-400 text-xs mt-1">
                       {currentLanguage === 'TR' 
-                        ? 'Bayi paneliniz aktif. Sistemimiz üzerinden 7/24 kesintisiz sosyal ağ gönderimi sağlayabilirsiniz.' 
-                        : 'Your reseller panel is active. 24/7 seamless social media order processing is enabled.'}
+                        ? 'Müşteri paneliniz aktif. Sistemimiz üzerinden 7/24 kesintisiz sosyal ağ gönderimi sağlayabilirsiniz.' 
+                        : 'Your panel is active. 24/7 seamless social media order processing is enabled.'}
                     </p>
                   </div>
                   <div className="bg-[#090918]/60 p-3 rounded-2xl border border-white/5 flex items-center gap-3 shrink-0">

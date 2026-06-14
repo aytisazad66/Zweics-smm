@@ -9,7 +9,7 @@ export const ShopierSuccess: React.FC = () => {
   const [countdown, setCountdown] = useState(5);
 
   const urlRef = new URLSearchParams(window.location.search).get('ref') || '';
-  const ref = urlRef || localStorage.getItem('shopier_pending_ref') || '';
+  const ref = urlRef || sessionStorage.getItem('shopier_pending_ref') || '';
 
   useEffect(() => {
     if (!ref) {
@@ -42,10 +42,7 @@ export const ShopierSuccess: React.FC = () => {
       const data = await resp.json();
 
       if (data.status === 'completed' || data.status === 'already_processed') {
-        localStorage.removeItem('shopier_pending_ref');
-        localStorage.removeItem('shopier_pending_amount');
-        // Signal the main tab that payment is done
-        localStorage.setItem('shopier_payment_done', JSON.stringify({ ref, amount: data.amount, ts: Date.now() }));
+        sessionStorage.removeItem('shopier_pending_ref');
         setStatus('success');
         setAmount(data.amount);
         setMessage(data.status === 'already_processed'

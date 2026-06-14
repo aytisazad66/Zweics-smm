@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { XCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 
 export const ShopierFail: React.FC = () => {
-  const ref = new URLSearchParams(window.location.search).get('ref') || localStorage.getItem('shopier_pending_ref') || '';
+  const ref = new URLSearchParams(window.location.search).get('ref') || sessionStorage.getItem('shopier_pending_ref') || '';
   const [countdown, setCountdown] = useState(8);
 
   useEffect(() => {
