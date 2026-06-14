@@ -281,8 +281,11 @@ function shopierPlugin(): Plugin {
       }),
     });
     if (!resp.ok) { const t = await resp.text(); console.error('[Shopier] create failed:', t); return null; }
-    const data = await resp.json() as { id: string; url: string };
-    return { id: String(data.id), url: data.url };
+    const data = await resp.json() as any;
+    console.log('[Shopier] create-product response:', JSON.stringify(data));
+    const productId = String(data.id ?? data.productId ?? '');
+    const productUrl = data.url ?? data.productUrl ?? data.link ?? data.checkoutUrl ?? `https://www.shopier.com/s/${productId}`;
+    return { id: productId, url: productUrl };
   }
 
   // Ödeme doğrulama: Shopier orders API + zaman & tutar filtresi.
