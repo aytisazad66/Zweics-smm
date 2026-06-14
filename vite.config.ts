@@ -286,31 +286,24 @@ function shopierPlugin(): Plugin {
   }
 
   async function shopierCheckOrders(apiKey: string, productId: string): Promise<boolean> {
-    // Primary: orders endpoint filtered by product_id
-    // Real Shopier order statuses: status="unfulfilled", paymentStatus="paid"
+    // Shopier sipariş durumu: ödenmemiş = paymentStatus:"pending" | ödenmis = paymentStatus:"paid"
+    // status="unfulfilled" hem ödenmemiş hem ödenmişlerde olabilir — güvenilmez, kullanma
+    // SADECE paymentStatus === 'paid' veya 'completed' kabul edilir
     try {
-      const r = await fetch(`https://api.shopier.com/v1/orders?product_id=${productId}&limit=10`, {
+      const r = await fetch(`https://api.shopier.com/v1/orders?product_id=${productId}&limit=20`, {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
       });
       if (r.ok) {
         const data = await r.json() as any;
         const list: any[] = Array.isArray(data) ? data : (data?.data ?? data?.orders ?? []);
+        // SADECE paymentStatus kontrolü — status alanı güvenilmez (unfulfilled = shipped değil, paid değil)
         if (list.some((o: any) =>
-          o.paymentStatus === 'paid' || o.paymentStatus === 'completed' ||
-          o.status === 'paid' || o.status === 'completed' || o.status === 'fulfilled'
+          o.paymentStatus === 'paid' || o.paymentStatus === 'completed'
         )) return true;
       }
     } catch {}
-    // Fallback: check product stock (stockQuantity drops to 0 after purchase)
-    try {
-      const r = await fetch(`https://api.shopier.com/v1/products/${productId}`, {
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Accept': 'application/json' },
-      });
-      if (r.ok) {
-        const prod = await r.json() as any;
-        if ((prod.stockQuantity ?? 1) === 0) return true;
-      }
-    } catch {}
+    // NOT: stockQuantity === 0 kontrolü KALDIRILDI
+    // Shopier dijital ürünlerde stockQuantity'yi ödeme olmadan da 0 yapabiliyor — güvensiz
     return false;
   }
 
@@ -391,8 +384,17 @@ function shopierPlugin(): Plugin {
             const payment = payments[ref];
             if (!payment) { res.writeHead(404); res.end(JSON.stringify({ ok: false, status: 'not_found', message: 'Ödeme kaydı bulunamadı.' })); return; }
             if (payment.status === 'completed') {
+              const creditedAmount = payment.creditAmount ?? payment.amount;
               res.writeHead(200);
-              res.end(JSON.stringify({ ok: true, status: 'already_processed', amount: payment.amount }));
+              res.end(JSON.stringify({ ok: true, status: 'already_processed', amount: creditedAmount }));
+              return;
+            }
+            // Güvenlik: ürün oluşturulduktan sonra en az 15 saniye geçmeden onaylanmasın
+            const createdAt = payment.createdAt ? new Date(payment.createdAt).getTime() : 0;
+            const elapsedSec = (Date.now() - createdAt) / 1000;
+            if (elapsedSec < 15) {
+              res.writeHead(200);
+              res.end(JSON.stringify({ ok: true, status: 'pending', amount: payment.creditAmount ?? payment.amount }));
               return;
             }
             const paid = await shopierCheckOrders(cfg.apiKey, payment.shopierProductId);
