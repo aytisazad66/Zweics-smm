@@ -505,29 +505,11 @@ export const Landing: React.FC = () => {
       } catch { /* server unavailable */ }
       setAuthLoading(false);
 
-      // 3. Demo fallback
-      const isDemo = authEmail === 'client@gmail.com' || authEmail === 'user@gmail.com';
-      if (isDemo || authPassword === 'password123') {
-        const targetUser = users[0] || { id: "1", fullName: "Demo Kullanıcı", email: authEmail, balance: 1500, totalOrders: 15, joinedDate: "01.01.2026", status: "active" };
-        sessionStorage.setItem('smm_client_user_id', targetUser.id);
-        sessionStorage.setItem('smm_client_user_cache', JSON.stringify(targetUser));
-        setCurrentClientUser(targetUser as any);
-        setClientLoggedIn(true);
-        setPortalMode('client');
-        setAuthModalOpen(false);
-        showToast(currentLanguage === 'TR' ? 'Demo kullanıcı olarak giriş yapıldı.' : 'Logged in as demo client.', 'success');
-      } else {
-        showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı. Lütfen yeni kayıt oluşturun.' : 'Client not found. Please register.', 'error');
-      }
+      // 3. Kullanıcı bulunamadı
+      showToast(currentLanguage === 'TR' ? 'Kullanıcı bulunamadı. Lütfen yeni kayıt oluşturun.' : 'Client not found. Please register.', 'error');
     }
   };
 
-  const handleQuickLogin = (email: string) => {
-    setAuthEmail(email);
-    setAuthPassword('password123');
-    setAuthTab('login');
-    setAuthModalOpen(true);
-  };
 
   return (
     <div className="min-h-screen bg-[#090915] text-[#eeeeff] font-sans antialiased relative overflow-hidden">
