@@ -561,7 +561,7 @@ export const Landing: React.FC = () => {
               {currentLanguage === 'TR' ? 'Neden Biz?' : 'Why SMM Pro?'}
             </a>
             <a href="#api-sec" className="hover:text-[#00D4FF] transition-colors">
-              {currentLanguage === 'TR' ? 'API Dokümantasyonu' : 'Reseller API'}
+              {currentLanguage === 'TR' ? 'API Entegrasyonu' : 'Reseller API'}
             </a>
             <a href="#faq" className="hover:text-[#00D4FF] transition-colors">
               FAQ
@@ -638,6 +638,7 @@ export const Landing: React.FC = () => {
             <a href="#api-sec" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
               {currentLanguage === 'TR' ? 'API Entegrasyonu' : 'Reseller API'}
             </a>
+
             <a href="#faq" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
               FAQ
             </a>
@@ -979,34 +980,170 @@ export const Landing: React.FC = () => {
       </section>
 
       {/* Developer API section */}
-      <section id="api-sec" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
-        <div className="bg-gradient-to-r from-cyan-950/20 to-purple-950/20 border border-white/5 rounded-3xl p-6 sm:p-10 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-8 backdrop-blur-md">
-          <div className="space-y-3.5 max-w-xl text-left">
-            <Code className="w-8 h-8 text-cyan-400" />
-            <h3 className="text-xl sm:text-2xl font-bold font-sora text-white">
-              {currentLanguage === 'TR' ? 'Kendi Sitenizden Mi Satış Yapacaksınız?' : 'Are You Reselling from Your Personal Codebase?'}
-            </h3>
-            <p className="text-xs text-gray-400 leading-relaxed">
-              {currentLanguage === 'TR' 
-                ? 'Panelimizin kusursuz JSON API desteği sayesinde tüm API entegrasyonlarını saniyeler içinde tamamlayın. Perfect Panel, SMM Lite ve tüm diğer altyapılarla uyumludur.' 
-                : 'Our comprehensive REST API supports continuous webhook triggers and full multi-currency sync operations.'}
-            </p>
+      <section id="api-sec" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14 space-y-8">
+
+        {/* Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs font-bold uppercase tracking-widest">
+            <Code className="w-3.5 h-3.5" />
+            {currentLanguage === 'TR' ? 'Bayi & Geliştirici API' : 'Reseller & Developer API'}
           </div>
-          <div>
-            <div className="flex flex-col items-center gap-2">
-              <button
-                onClick={() => {
-                  setAuthTab('register');
-                  setAuthModalOpen(true);
-                }}
-                className="px-6 py-3.5 bg-[#121226] hover:bg-[#1a1a36] border border-cyan-400/30 text-cyan-400 font-bold text-xs rounded-xl flex items-center gap-1.5 transition active:scale-95 cursor-pointer shrink-0"
-              >
-                <span>{currentLanguage === 'TR' ? 'Hemen API KEY Al' : 'Generate API KEY'}</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-              <span className="text-[10px] text-yellow-400 font-bold">(Yakında...)</span>
+          <h2 className="text-2xl sm:text-3xl font-bold font-sora text-white">
+            {currentLanguage === 'TR' ? 'Bor Media\'yı Kendi Sisteminize Entegre Edin' : 'Integrate Bor Media into Your System'}
+          </h2>
+          <p className="text-sm text-gray-400 max-w-2xl mx-auto leading-relaxed">
+            {currentLanguage === 'TR'
+              ? 'Kendi SMM panelinizi, web sitenizi veya yazılımınızı JSON REST API ile bize bağlayın. Bor Media altyapısını sağlayıcı olarak kullanın.'
+              : 'Connect your own SMM panel, website or script to us via JSON REST API. Use Bor Media infrastructure as your provider.'}
+          </p>
+        </div>
+
+        {/* Endpoint Banner */}
+        <div className="bg-[#0d0d1c] border border-cyan-500/20 rounded-2xl p-5 flex flex-col sm:flex-row items-center gap-4">
+          <div className="flex-1 space-y-1">
+            <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest block">API ENDPOINT</span>
+            <code className="text-emerald-400 font-mono text-sm sm:text-base font-bold">POST https://bormedya.com/api-v1.php</code>
+            <p className="text-[11px] text-gray-500">{currentLanguage === 'TR' ? 'Content-Type: application/x-www-form-urlencoded veya application/json' : 'Content-Type: application/x-www-form-urlencoded or application/json'}</p>
+          </div>
+          <button
+            onClick={() => { setAuthTab('register'); setAuthModalOpen(true); }}
+            className="px-5 py-3 bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-bold text-xs rounded-xl flex items-center gap-2 transition active:scale-95 cursor-pointer shrink-0 hover:opacity-90"
+          >
+            {currentLanguage === 'TR' ? '🔑 API Anahtarı Al' : '🔑 Get API Key'}
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* 4 Endpoint cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {[
+            {
+              action: 'services', badge: 'LIST', badgeClass: 'bg-blue-500/20 text-blue-300',
+              title: currentLanguage === 'TR' ? 'Servis Listesi' : 'Service List',
+              desc: currentLanguage === 'TR' ? 'Tüm aktif servisleri ID, isim, oran ve min/max miktarlarıyla listeler.' : 'Returns all active services with ID, name, rate and min/max quantities.',
+              params: 'key, action="services"',
+              response: '[ { "service": "101", "name": "...", "rate": "12.50", "min": 100, "max": 50000 } ]',
+            },
+            {
+              action: 'add_order', badge: 'CREATE', badgeClass: 'bg-emerald-500/20 text-emerald-300',
+              title: currentLanguage === 'TR' ? 'Sipariş Oluştur' : 'Create Order',
+              desc: currentLanguage === 'TR' ? 'Yeni sipariş oluşturur, bakiye otomatik düşülür.' : 'Creates a new order, balance is automatically deducted.',
+              params: 'key, action="add_order", service, link, quantity',
+              response: '{ "order": "ORD-00042" }',
+            },
+            {
+              action: 'status', badge: 'QUERY', badgeClass: 'bg-yellow-500/20 text-yellow-300',
+              title: currentLanguage === 'TR' ? 'Sipariş Durumu' : 'Order Status',
+              desc: currentLanguage === 'TR' ? 'Siparişin güncel durumunu ve kalan miktarını sorgular.' : 'Returns current status and remaining quantity of an order.',
+              params: 'key, action="status", order',
+              response: '{ "status": "In progress", "remains": "850", "currency": "TRY" }',
+            },
+            {
+              action: 'balance', badge: 'ACCOUNT', badgeClass: 'bg-purple-500/20 text-purple-300',
+              title: currentLanguage === 'TR' ? 'Bakiye Sorgula' : 'Query Balance',
+              desc: currentLanguage === 'TR' ? 'Hesap bakiyenizi TRY cinsinden döner.' : 'Returns your account balance in TRY.',
+              params: 'key, action="balance"',
+              response: '{ "balance": "245.80", "currency": "TRY" }',
+            },
+          ].map((ep) => (
+            <div key={ep.action} className="bg-[#121226] border border-white/5 rounded-2xl p-5 space-y-3 hover:border-white/10 transition">
+              <div className="flex items-center gap-2">
+                <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase font-mono ${ep.badgeClass}`}>{ep.badge}</span>
+                <code className="text-cyan-400 font-mono text-xs font-bold">action={ep.action}</code>
+              </div>
+              <div>
+                <span className="text-sm font-bold text-white block">{ep.title}</span>
+                <p className="text-[11px] text-gray-500 mt-0.5">{ep.desc}</p>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{currentLanguage === 'TR' ? 'PARAMETRELER' : 'PARAMS'}</span>
+                <code className="text-[10px] text-yellow-400 font-mono block">{ep.params}</code>
+              </div>
+              <div className="space-y-1">
+                <span className="text-[9px] font-bold text-gray-600 uppercase tracking-widest">{currentLanguage === 'TR' ? 'ÖRNEK YANIT' : 'SAMPLE RESPONSE'}</span>
+                <pre className="bg-[#050510] rounded-lg p-2 text-[9px] font-mono text-emerald-400 border border-white/5 overflow-x-auto">{ep.response}</pre>
+              </div>
             </div>
-          </div>
+          ))}
+        </div>
+
+        {/* Code Examples */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {[
+            {
+              lang: 'cURL', color: 'text-orange-400',
+              code: `curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ&action=services"
+
+curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ\\
+&action=add_order\\
+&service=101\\
+&link=https://instagram.com/ornek\\
+&quantity=1000"`,
+            },
+            {
+              lang: 'PHP', color: 'text-purple-400',
+              code: `function borApi($action, $p=[]) {
+  $url = 'https://bormedya.com/api-v1.php';
+  $ch = curl_init($url);
+  curl_setopt_array($ch, [
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => http_build_query(
+      array_merge(
+        ['key'=>'bm_live_KEY','action'=>$action],
+        $p
+      )
+    ),
+    CURLOPT_RETURNTRANSFER => true,
+  ]);
+  return json_decode(curl_exec($ch), true);
+}
+$order = borApi('add_order', [
+  'service'=>'101',
+  'link'=>'https://instagram.com/ornek',
+  'quantity'=>1000
+]);`,
+            },
+            {
+              lang: 'Python', color: 'text-blue-400',
+              code: `import requests
+
+def bor_api(action, **params):
+    r = requests.post(
+        'https://bormedya.com/api-v1.php',
+        data={'key':'bm_live_KEY',
+              'action':action,**params}
+    )
+    return r.json()
+
+svcs = bor_api('services')
+order = bor_api(
+    'add_order',
+    service='101',
+    link='https://instagram.com/ornek',
+    quantity=1000
+)
+print(order['order'])  # ORD-00042`,
+            },
+          ].map((ex) => (
+            <div key={ex.lang} className="bg-[#0d0d1c] border border-white/5 rounded-2xl p-4 space-y-2">
+              <span className={`text-[10px] font-bold font-mono uppercase ${ex.color}`}>{ex.lang}</span>
+              <pre className="text-[9px] font-mono text-gray-300 leading-relaxed overflow-x-auto whitespace-pre-wrap">{ex.code}</pre>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <div className="text-center space-y-3 pt-2">
+          <p className="text-xs text-gray-500">{currentLanguage === 'TR' ? 'API anahtarınızı ücretsiz üye olarak anında alabilirsiniz.' : 'Get your API key instantly with a free account.'}</p>
+          <button
+            onClick={() => { setAuthTab('register'); setAuthModalOpen(true); }}
+            className="inline-flex items-center gap-2 px-8 py-3.5 bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-bold text-sm rounded-xl transition active:scale-95 cursor-pointer hover:opacity-90"
+          >
+            {currentLanguage === 'TR' ? 'Ücretsiz Hesap Aç & API Al' : 'Create Free Account & Get API Key'}
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </section>
 

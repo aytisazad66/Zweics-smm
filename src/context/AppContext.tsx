@@ -110,6 +110,7 @@ interface AppContextProps {
   clientLoggedIn: boolean;
   setClientLoggedIn: (val: boolean) => void;
   registerClient: (fullName: string, email: string, password?: string) => boolean;
+  generateApiKey: () => void;
   placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<string | null>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
@@ -1121,6 +1122,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return true;
   };
 
+  const generateApiKey = () => {
+    if (!currentClientUser) return;
+    const chars = 'abcdef0123456789';
+    const rand = Array.from({ length: 32 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
+    const newKey = `bm_live_${rand}`;
+    const updated = { ...currentClientUser, apiKey: newKey };
+    setCurrentClientUser(updated);
+    setUsers(prev => prev.map(u => u.id === currentClientUser.id ? updated : u));
+    showToast(currentLanguage === 'TR' ? 'API anahtarı oluşturuldu! Güvende tutun.' : 'API key generated! Keep it safe.', 'success');
+  };
+
   const placeClientOrder = async (serviceId: string, quantity: number, link: string, username: string): Promise<string | null> => {
     if (!currentClientUser) {
       showToast(currentLanguage === 'TR' ? 'Lütfen giriş yapın.' : 'Please log in.', 'error');
@@ -1411,6 +1423,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       currentClientUser, setCurrentClientUser,
       clientLoggedIn, setClientLoggedIn,
       registerClient,
+      generateApiKey,
       placeClientOrder,
       submitClientPaymentRequest,
       submitClientTicket,

@@ -50,6 +50,7 @@ export interface User {
   note?: string;
   notifications?: UserNotification[];
   password?: string;
+  apiKey?: string;
 }
 
 export interface PaymentMethod {

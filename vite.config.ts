@@ -303,6 +303,151 @@ function kvStorePlugin(): Plugin {
         })();
       });
 
+      // ── API v1 — Public reseller API endpoint ────────────────────────────────
+      server.middlewares.use('/api-v1.php', (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Cache-Control', 'no-store');
+        if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
+
+        let rawBody = '';
+        req.on('data', (chunk: Buffer) => { rawBody += chunk.toString(); });
+        req.on('end', () => {
+          const apiError = (msg: string) => { res.writeHead(200); res.end(JSON.stringify({ error: msg })); };
+
+          // Parse params from body (urlencoded or JSON) and query string
+          const urlObj = new URL(req.url || '/', 'http://localhost');
+          let params: Record<string, string> = {};
+          urlObj.searchParams.forEach((v, k) => { params[k] = v; });
+          const ct = (req.headers['content-type'] || '');
+          if (ct.includes('application/json')) {
+            try { Object.assign(params, JSON.parse(rawBody)); } catch {}
+          } else if (rawBody) {
+            new URLSearchParams(rawBody).forEach((v, k) => { params[k] = v; });
+          }
+
+          const apiKey = (params['key'] || '').trim();
+          const action = (params['action'] || '').trim();
+          if (!apiKey) return apiError('API anahtarı eksik. key parametresini gönderin.');
+
+          // Load users
+          const usersFile = path.join(DATA_DIR, 'smm_users.json');
+          let usersArr: any[] = [];
+          if (fs.existsSync(usersFile)) {
+            try {
+              const raw = JSON.parse(fs.readFileSync(usersFile, 'utf-8'));
+              usersArr = JSON.parse(raw.value || '[]');
+            } catch {}
+          }
+          const authUser = usersArr.find((u: any) => u.apiKey === apiKey);
+          if (!authUser) return apiError('Geçersiz API anahtarı.');
+          if ((authUser.status ?? 'active') !== 'active') return apiError('Hesabınız askıya alınmış.');
+
+          if (action === 'balance') {
+            res.writeHead(200);
+            res.end(JSON.stringify({ balance: Number(authUser.balance || 0).toFixed(2), currency: 'TRY' }));
+            return;
+          }
+
+          if (action === 'services') {
+            const sf = path.join(DATA_DIR, 'smm_services.json');
+            let svc: any[] = [];
+            if (fs.existsSync(sf)) {
+              try { const r = JSON.parse(fs.readFileSync(sf, 'utf-8')); svc = JSON.parse(r.value || '[]'); } catch {}
+            }
+            const result = svc
+              .filter((s: any) => (s.status ?? 'active') === 'active')
+              .map((s: any) => ({
+                service: String(s.id ?? ''),
+                name: s.name ?? '',
+                type: 'Default',
+                category: s.platform ?? '',
+                rate: Number(s.pricePer1000 ?? 0).toFixed(2),
+                min: Number(s.min ?? 10),
+                max: Number(s.max ?? 100000),
+                description: s.description ?? '',
+                delivery_speed: s.deliverySpeed ?? '',
+              }));
+            res.writeHead(200);
+            res.end(JSON.stringify(result));
+            return;
+          }
+
+          if (action === 'add_order') {
+            const serviceId = String(params['service'] || '').trim();
+            const link = String(params['link'] || '').trim();
+            const quantity = parseInt(params['quantity'] || '0', 10);
+            if (!serviceId || !link || !quantity) return apiError('Zorunlu parametreler eksik: service, link, quantity');
+
+            const sf = path.join(DATA_DIR, 'smm_services.json');
+            let svc: any[] = [];
+            if (fs.existsSync(sf)) {
+              try { const r = JSON.parse(fs.readFileSync(sf, 'utf-8')); svc = JSON.parse(r.value || '[]'); } catch {}
+            }
+            const service = svc.find((s: any) => String(s.id) === serviceId);
+            if (!service) return apiError('Servis bulunamadı: ' + serviceId);
+            if ((service.status ?? 'active') !== 'active') return apiError('Bu servis şu anda aktif değil.');
+            const min = Number(service.min ?? 10), max = Number(service.max ?? 100000);
+            if (quantity < min || quantity > max) return apiError(`Miktar ${min} ile ${max} arasında olmalıdır.`);
+
+            const charge = Math.round((Number(service.pricePer1000 ?? 0) * quantity / 1000) * 100) / 100;
+            const balance = Number(authUser.balance ?? 0);
+            if (balance < charge) return apiError(`Yetersiz bakiye. Mevcut: ${balance.toFixed(2)} TRY, Gereken: ${charge.toFixed(2)} TRY`);
+
+            const of = path.join(DATA_DIR, 'smm_orders.json');
+            let ordersArr: any[] = [];
+            if (fs.existsSync(of)) {
+              try { const r = JSON.parse(fs.readFileSync(of, 'utf-8')); ordersArr = JSON.parse(r.value || '[]'); } catch {}
+            }
+            const orderId = 'ORD-' + String(ordersArr.length + 1).padStart(5, '0');
+            ordersArr.push({
+              id: orderId, userId: authUser.id, username: authUser.email,
+              serviceId, serviceName: service.name, platform: service.platform ?? '',
+              quantity, charge, status: 'Bekliyor', date: new Date().toISOString().split('T')[0],
+              link, logs: [{ time: new Date().toTimeString().slice(0,5), text: 'API üzerinden sipariş oluşturuldu.' }], source: 'api',
+            });
+            // Deduct balance
+            const updatedUsers = usersArr.map((u: any) =>
+              u.id === authUser.id ? { ...u, balance: Math.round((Number(u.balance) - charge) * 100) / 100, totalOrders: (u.totalOrders || 0) + 1 } : u
+            );
+            try {
+              fs.writeFileSync(of, JSON.stringify({ value: JSON.stringify(ordersArr) }), 'utf-8');
+              fs.writeFileSync(usersFile, JSON.stringify({ value: JSON.stringify(updatedUsers) }), 'utf-8');
+            } catch { return apiError('Sipariş kaydedilemedi.'); }
+
+            res.writeHead(200);
+            res.end(JSON.stringify({ order: orderId }));
+            return;
+          }
+
+          if (action === 'status') {
+            const orderId = String(params['order'] || '').trim();
+            if (!orderId) return apiError('order parametresi zorunludur.');
+            const of = path.join(DATA_DIR, 'smm_orders.json');
+            let ordersArr: any[] = [];
+            if (fs.existsSync(of)) {
+              try { const r = JSON.parse(fs.readFileSync(of, 'utf-8')); ordersArr = JSON.parse(r.value || '[]'); } catch {}
+            }
+            const ord = ordersArr.find((o: any) => o.id === orderId && o.userId === authUser.id);
+            if (!ord) return apiError('Sipariş bulunamadı: ' + orderId);
+            const statusMap: Record<string, string> = { 'Bekliyor': 'Pending', 'İşlemde': 'In progress', 'Tamamlandı': 'Completed', 'İptal': 'Canceled' };
+            res.writeHead(200);
+            res.end(JSON.stringify({
+              charge: Number(ord.charge || 0).toFixed(2),
+              start_count: '0',
+              status: statusMap[ord.status] ?? 'Pending',
+              remains: String(ord.quantity ?? 0),
+              currency: 'TRY',
+            }));
+            return;
+          }
+
+          apiError('Geçersiz action. Desteklenen: services, add_order, status, balance');
+        });
+      });
+
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (!req.url?.startsWith('/api/kv/')) { next(); return; }
         const key = req.url.replace('/api/kv/', '').split('?')[0];
@@ -750,7 +895,7 @@ function copyFilesAfterBuild(): Plugin {
   return {
     name: 'copy-cpanel-files',
     closeBundle() {
-      const files = ['public/.htaccess', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php'];
+      const files = ['public/.htaccess', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php', 'public/api-v1.php'];
       for (const src of files) {
         const dest = `dist/${path.basename(src)}`;
         if (fs.existsSync(src)) {

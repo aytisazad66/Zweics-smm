@@ -119,7 +119,8 @@ export const ClientDashboard: React.FC = () => {
     currentLanguage,
     setCurrentLanguage,
     showToast,
-    announcementText
+    announcementText,
+    generateApiKey
   } = useAppState();
 
   // Unified Tab Management
@@ -986,7 +987,7 @@ export const ClientDashboard: React.FC = () => {
                   { id: 'add-funds', labelTR: 'Bakiye Yükle', labelEN: 'Deposit Assets', icon: Wallet },
                   { id: 'tickets', labelTR: 'Destek Masası', labelEN: 'Support Desk', icon: MessageSquare },
                   { id: 'notifications', labelTR: 'Bildirimler', labelEN: 'Notifications', icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
-                  { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: true },
+                  { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: false },
                 ].map(tab => {
                   const TabIcon = tab.icon;
                   const isSel = activeTab === tab.id;
@@ -1247,7 +1248,7 @@ export const ClientDashboard: React.FC = () => {
               { id: 'add-funds', labelTR: 'Bakiye Yükle', labelEN: 'Deposit Assets', icon: Wallet },
               { id: 'tickets', labelTR: 'Destek Masası', labelEN: 'Support Desk', icon: MessageSquare },
               { id: 'notifications', labelTR: 'Bildirimler', labelEN: 'Notifications', icon: Bell, badge: unreadNotifCount > 0 ? unreadNotifCount : undefined },
-              { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: true },
+              { id: 'api-docs', labelTR: 'Entegrasyon & API', labelEN: 'API Playground', icon: Code, yakinda: false },
             ].map(tab => {
               const TabIcon = tab.icon;
               const isSel = activeTab === tab.id;
@@ -2542,231 +2543,330 @@ export const ClientDashboard: React.FC = () => {
               
               <div className="bg-[#121226] border border-white/5 rounded-3xl p-6 space-y-4 shadow-xl">
                 <div className="border-b border-white/5 pb-4">
-                  <h3 className="text-base font-bold font-sora text-white">{currentLanguage === 'TR' ? 'Bayi Ortaklar & Developer API Belgesi' : 'Developer Connection API Gateway'}</h3>
-                  <p className="text-xs text-gray-500 mt-1">{currentLanguage === 'TR' ? 'Kendi SMM bayilik sitelerinizi / yazılımlarınızı saniyeler içinde portalımıza bağlayın.' : 'Connect custom scripts to dispatch balance payloads'}</p>
+                  <h3 className="text-base font-bold font-sora text-white">{currentLanguage === 'TR' ? 'Entegrasyon & API — Bayilik Arayüzü' : 'Integration & API — Reseller Interface'}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{currentLanguage === 'TR' ? 'Kendi SMM panelinizi, sitenizi veya yazılımınızı bize bağlayın. Bor Media\'yı sağlayıcı olarak kullanın.' : 'Connect your own SMM panel, website or script. Use Bor Media as your backend provider.'}</p>
                 </div>
 
-                {/* API Console specifications */}
+                {/* API Key Section */}
                 <div className="p-4 bg-[#0d0d1c] border border-white/10 rounded-2xl space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">{currentLanguage === 'TR' ? 'SİZE ÖZEL AKTİF API ANAHTARI' : 'INDIVIDUAL LIVE TOKEN KEY'}</span>
-                    <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono font-bold text-[8.5px] uppercase tracking-wider">★ STABLE KEY</span>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{currentLanguage === 'TR' ? 'KİŞİSEL API ANAHTARINIZ' : 'YOUR PERSONAL API KEY'}</span>
+                    {currentClientUser.apiKey
+                      ? <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-mono font-bold text-[8.5px] uppercase tracking-wider">● AKTİF</span>
+                      : <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 font-bold text-[8.5px] uppercase tracking-wider">— HENÜZ OLUŞTURULMADI</span>
+                    }
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-2.5">
-                    <input
-                      type="text"
-                      readOnly
-                      className="flex-1 bg-[#121226] border border-white/10 text-cyan-300 font-mono p-2.5 rounded-xl outline-none"
-                      value={`smm_pro_partner_key_${currentClientUser.fullName.toLowerCase().replace(/\s/g, '_')}_7b2ffa9`}
-                    />
-                    <button
-                      onClick={() => showToast(currentLanguage === 'TR' ? 'API Token Anahtarı güvenle kopyalandı!' : 'Credentials copied to clipboard.', 'success')}
-                      className="px-5 py-2.5 bg-cyan-400 hover:bg-cyan-505 text-black font-extrabold rounded-xl transition"
-                    >
-                      {currentLanguage === 'TR' ? 'Kopyala' : 'Copy Key'}
-                    </button>
+                  {currentClientUser.apiKey ? (
+                    <div className="flex flex-col sm:flex-row gap-2.5">
+                      <input
+                        type="text"
+                        readOnly
+                        className="flex-1 bg-[#121226] border border-white/10 text-cyan-300 font-mono p-2.5 rounded-xl outline-none text-[11px]"
+                        value={currentClientUser.apiKey}
+                      />
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(currentClientUser.apiKey!); showToast(currentLanguage === 'TR' ? 'API anahtarı kopyalandı!' : 'API key copied!', 'success'); }}
+                        className="px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-black font-extrabold rounded-xl transition text-[11px] cursor-pointer shrink-0"
+                      >
+                        {currentLanguage === 'TR' ? 'Kopyala' : 'Copy'}
+                      </button>
+                      <button
+                        onClick={generateApiKey}
+                        className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 font-bold rounded-xl transition text-[11px] cursor-pointer shrink-0"
+                      >
+                        {currentLanguage === 'TR' ? 'Yenile' : 'Regenerate'}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-gray-500">{currentLanguage === 'TR' ? 'API anahtarı oluşturarak yazılımlarınızı Bor Media altyapısına bağlayabilirsiniz.' : 'Generate an API key to connect your software to the Bor Media infrastructure.'}</p>
+                      <button
+                        onClick={generateApiKey}
+                        className="px-5 py-2.5 bg-gradient-to-r from-cyan-500 to-purple-600 text-white font-extrabold rounded-xl transition text-[11px] cursor-pointer hover:opacity-90"
+                      >
+                        {currentLanguage === 'TR' ? '🔑 API Anahtarı Oluştur' : '🔑 Generate API Key'}
+                      </button>
+                    </div>
+                  )}
+
+                  <p className="text-[10px] text-amber-400/80 flex items-start gap-1.5">
+                    <span>⚠</span>
+                    <span>{currentLanguage === 'TR' ? 'API anahtarınızı kimseyle paylaşmayın. Sızdırılırsa "Yenile" butonuyla yeni anahtar oluşturun — eski anahtar geçersiz olur.' : 'Never share your API key. If leaked, regenerate it — the old key will be invalidated immediately.'}</span>
+                  </p>
+                </div>
+
+                {/* Endpoint Info */}
+                <div className="p-4 bg-[#0d0d1c] border border-cyan-500/20 rounded-2xl space-y-2">
+                  <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-widest">API ENDPOINT</span>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <code className="bg-[#050510] text-emerald-400 font-mono text-[11px] px-3 py-2 rounded-lg border border-white/10 flex-1">
+                      POST https://bormedya.com/api-v1.php
+                    </code>
+                    <button onClick={() => { navigator.clipboard.writeText('https://bormedya.com/api-v1.php'); showToast('URL kopyalandı!', 'success'); }} className="px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-gray-400 font-bold rounded-lg text-[10px] cursor-pointer shrink-0">Kopyala</button>
                   </div>
+                  <p className="text-[10px] text-gray-500">{currentLanguage === 'TR' ? 'Tüm istekler bu adrese POST olarak gönderilir. Content-Type: application/x-www-form-urlencoded veya application/json.' : 'All requests are sent as POST to this URL. Content-Type: application/x-www-form-urlencoded or application/json.'}</p>
                 </div>
               </div>
 
-              {/* Developer Live Simulator Playground */}
+              {/* Endpoint Documentation */}
+              <div className="bg-[#121226] border border-white/5 rounded-3xl p-6 space-y-6 shadow-xl">
+                <div className="border-b border-white/5 pb-3">
+                  <h4 className="text-sm font-bold font-sora text-white flex items-center gap-2">
+                    <Code className="w-4 h-4 text-purple-400" />
+                    <span>{currentLanguage === 'TR' ? 'API Endpoint Referansı' : 'API Endpoint Reference'}</span>
+                  </h4>
+                </div>
+
+                {[
+                  {
+                    action: 'services',
+                    badge: 'LIST',
+                    badgeColor: 'bg-blue-500/20 text-blue-300',
+                    title: currentLanguage === 'TR' ? 'Servis Listesi' : 'Service List',
+                    desc: currentLanguage === 'TR' ? 'Aktif tüm servisleri ID, isim, oran, min/max miktarlarıyla listeler.' : 'Returns all active services with ID, name, rate, min/max quantities.',
+                    params: [
+                      { name: 'key', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'API anahtarınız' : 'Your API key' },
+                      { name: 'action', type: 'string', req: true, desc: '"services"' },
+                    ],
+                    response: `[
+  {
+    "service": "101",
+    "name": "Instagram Türk Takipçi",
+    "type": "Default",
+    "category": "Instagram",
+    "rate": "12.50",
+    "min": 100,
+    "max": 50000,
+    "description": "Türk hesaplar...",
+    "delivery_speed": "1-6 Saat"
+  }
+]`,
+                  },
+                  {
+                    action: 'add_order',
+                    badge: 'CREATE',
+                    badgeColor: 'bg-emerald-500/20 text-emerald-300',
+                    title: currentLanguage === 'TR' ? 'Sipariş Oluştur' : 'Create Order',
+                    desc: currentLanguage === 'TR' ? 'Yeni bir sipariş oluşturur. Bakiye otomatik düşülür.' : 'Creates a new order. Balance is automatically deducted.',
+                    params: [
+                      { name: 'key', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'API anahtarınız' : 'Your API key' },
+                      { name: 'action', type: 'string', req: true, desc: '"add_order"' },
+                      { name: 'service', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'Servis ID (services listesinden)' : 'Service ID from services list' },
+                      { name: 'link', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'Hedef URL (profil, video, gönderi linki)' : 'Target URL (profile, video, post link)' },
+                      { name: 'quantity', type: 'integer', req: true, desc: currentLanguage === 'TR' ? 'Miktar (min/max aralığında)' : 'Quantity (within min/max range)' },
+                    ],
+                    response: `{ "order": "ORD-00042" }`,
+                  },
+                  {
+                    action: 'status',
+                    badge: 'QUERY',
+                    badgeColor: 'bg-yellow-500/20 text-yellow-300',
+                    title: currentLanguage === 'TR' ? 'Sipariş Durumu' : 'Order Status',
+                    desc: currentLanguage === 'TR' ? 'Bir siparişin mevcut durumunu ve kalan miktarını sorgular.' : 'Returns current status and remaining quantity of an order.',
+                    params: [
+                      { name: 'key', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'API anahtarınız' : 'Your API key' },
+                      { name: 'action', type: 'string', req: true, desc: '"status"' },
+                      { name: 'order', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'Sipariş ID (add_order\'dan dönen)' : 'Order ID returned by add_order' },
+                    ],
+                    response: `{
+  "charge": "12.50",
+  "start_count": "0",
+  "status": "In progress",
+  "remains": "850",
+  "currency": "TRY"
+}`,
+                  },
+                  {
+                    action: 'balance',
+                    badge: 'ACCOUNT',
+                    badgeColor: 'bg-purple-500/20 text-purple-300',
+                    title: currentLanguage === 'TR' ? 'Bakiye Sorgula' : 'Query Balance',
+                    desc: currentLanguage === 'TR' ? 'Hesabınızdaki mevcut bakiyeyi döner.' : 'Returns the current balance on your account.',
+                    params: [
+                      { name: 'key', type: 'string', req: true, desc: currentLanguage === 'TR' ? 'API anahtarınız' : 'Your API key' },
+                      { name: 'action', type: 'string', req: true, desc: '"balance"' },
+                    ],
+                    response: `{
+  "balance": "245.80",
+  "currency": "TRY"
+}`,
+                  },
+                ].map((ep) => (
+                  <div key={ep.action} className="border border-white/5 rounded-2xl overflow-hidden">
+                    <div className="flex items-center gap-3 px-4 py-3 bg-white/3 border-b border-white/5">
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold font-mono uppercase ${ep.badgeColor}`}>{ep.badge}</span>
+                      <code className="text-cyan-400 font-mono text-[11px] font-bold">action={ep.action}</code>
+                      <span className="text-gray-400 text-[11px] ml-1">{ep.title}</span>
+                    </div>
+                    <div className="p-4 space-y-4">
+                      <p className="text-[11px] text-gray-400">{ep.desc}</p>
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">{currentLanguage === 'TR' ? 'PARAMETRELER' : 'PARAMETERS'}</span>
+                        <div className="space-y-1.5">
+                          {ep.params.map(p => (
+                            <div key={p.name} className="flex items-start gap-3 text-[10px]">
+                              <code className="text-yellow-400 font-mono w-20 shrink-0">{p.name}</code>
+                              <span className="text-gray-600 w-12 shrink-0">{p.type}</span>
+                              <span className={p.req ? 'text-red-400 w-14 shrink-0' : 'text-gray-600 w-14 shrink-0'}>{p.req ? (currentLanguage === 'TR' ? 'zorunlu' : 'required') : (currentLanguage === 'TR' ? 'opsiyonel' : 'optional')}</span>
+                              <span className="text-gray-500">{p.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[9px] font-bold text-gray-500 uppercase tracking-widest block mb-2">{currentLanguage === 'TR' ? 'BAŞARILI YANIT' : 'SUCCESS RESPONSE'}</span>
+                        <pre className="bg-[#050510] rounded-xl p-3 text-[10px] font-mono text-emerald-400 border border-white/5 overflow-x-auto leading-relaxed">{ep.response}</pre>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Code Examples */}
               <div className="bg-[#121226] border border-white/5 rounded-3xl p-6 space-y-5 shadow-xl">
-                
                 <div className="border-b border-white/5 pb-3">
                   <h4 className="text-sm font-bold font-sora text-white flex items-center gap-2">
                     <Terminal className="w-4 h-4 text-cyan-400" />
-                    <span>{currentLanguage === 'TR' ? 'İnteraktif API Playground & Canlı Test Terminali' : 'Interactive Playground & Live Testing Console'}</span>
+                    <span>{currentLanguage === 'TR' ? 'Kod Örnekleri' : 'Code Examples'}</span>
                   </h4>
-                  <p className="text-xs text-gray-500 mt-1">{currentLanguage === 'TR' ? 'API kodunuzun veya yazılımınızın portalımıza nasıl istek atacağını ve dönecek yanıtları tarayıcıda simüle edin!' : 'Verify JSON packets syntax directly in client layout.'}</p>
                 </div>
+                {[
+                  {
+                    lang: 'cURL',
+                    color: 'text-orange-400',
+                    code: `# Servis listesi al
+curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ&action=services"
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
-                  
-                  {/* Simulator configuration */}
-                  <div className="md:col-span-5 bg-[#0a0a1f] p-4 border border-white/5 rounded-2xl space-y-4">
-                    <span className="text-[9.5px] font-bold text-cyan-400 uppercase tracking-widest block">{currentLanguage === 'TR' ? '1. İSTEK PARAMETRELERİ' : '1. CONTEXT ARGS'}</span>
-                    
-                    <div className="space-y-4">
-                      
-                      {/* Select Method */}
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] text-gray-500 block uppercase font-bold">{currentLanguage === 'TR' ? 'Seçilecek API Metodu' : 'Execute API Method'}</label>
-                        <select
-                          className="w-full bg-[#121226] border border-white/10 rounded-xl py-2 px-3 text-[11px] text-white focus:outline-none"
-                          value={apiPlaygroundMethod}
-                          onChange={(e: any) => setApiPlaygroundMethod(e.target.value)}
-                        >
-                          <option value="add_order">{currentLanguage === 'TR' ? 'add_order (Yeni Sipariş)' : 'add_order (New Order)'}</option>
-                          <option value="status">{currentLanguage === 'TR' ? 'status (Sipariş Sorgu)' : 'status (Fetch Status)'}</option>
-                          <option value="balance">{currentLanguage === 'TR' ? 'balance (Bakiye Sorgu)' : 'balance (Account Details)'}</option>
-                        </select>
-                      </div>
+# Sipariş oluştur
+curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ&action=add_order&service=101&link=https://instagram.com/ornek&quantity=1000"
 
-                      {apiPlaygroundMethod === 'add_order' && (
-                        <>
-                          {/* Pick Service */}
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] text-gray-500 block uppercase font-bold">{currentLanguage === 'TR' ? 'Portföy Servis ID' : 'Target Service ID'}</label>
-                            <select
-                              className="w-full bg-[#121226] border border-white/10 rounded-xl py-2 px-3 text-[11px] text-white focus:outline-none"
-                              value={apiPlaygroundServiceId}
-                              onChange={(e) => setApiPlaygroundServiceId(e.target.value)}
-                            >
-                              {services.map(s => (
-                                <option key={s.id} value={s.id}>#{s.id} - {s.name.substring(0, 25)}...</option>
-                              ))}
-                            </select>
-                          </div>
+# Sipariş durumu sorgula
+curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ&action=status&order=ORD-00042"
 
-                          {/* Link payload */}
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] text-gray-500 block uppercase font-bold">{currentLanguage === 'TR' ? 'Gönderi Linki (URL)' : 'Link Context'}</label>
-                            <input
-                              type="text"
-                              className="w-full bg-[#121226] border border-white/10 rounded-xl py-2 px-3 text-[11px] text-white font-mono"
-                              value={apiPlaygroundOrderLink}
-                              onChange={(e) => setApiPlaygroundOrderLink(e.target.value)}
-                            />
-                          </div>
+# Bakiye sorgula
+curl -X POST https://bormedya.com/api-v1.php \\
+  -d "key=bm_live_ANAHTARINIZ&action=balance"`,
+                  },
+                  {
+                    lang: 'PHP',
+                    color: 'text-purple-400',
+                    code: `<?php
+function borMediaApi(string $action, array $params = []): array {
+    $apiKey = 'bm_live_ANAHTARINIZ';
+    $url    = 'https://bormedya.com/api-v1.php';
+    $payload = array_merge(['key' => $apiKey, 'action' => $action], $params);
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => http_build_query($payload),
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+    ]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    return json_decode($response, true) ?? [];
+}
 
-                          {/* Qty payload */}
-                          <div className="space-y-1.5">
-                            <label className="text-[10px] text-gray-500 block uppercase font-bold">{currentLanguage === 'TR' ? 'Arzulanan Miktar' : 'Scale Scope'}</label>
-                            <input
-                              type="number"
-                              className="w-full bg-[#121226] border border-white/10 rounded-xl py-2 px-3 text-[11px] text-white font-mono"
-                              value={apiPlaygroundQuantity}
-                              onChange={(e) => setApiPlaygroundQuantity(parseInt(e.target.value) || 1200)}
-                            />
-                          </div>
-                        </>
-                      )}
+$services = borMediaApi('services');
+$order    = borMediaApi('add_order', [
+    'service'  => '101',
+    'link'     => 'https://instagram.com/ornek_profil',
+    'quantity' => 1000,
+]);
+echo "Sipariş ID: " . ($order['order'] ?? 'HATA');
+$balance = borMediaApi('balance');
+echo "Bakiye: " . $balance['balance'] . " TRY";`,
+                  },
+                  {
+                    lang: 'Python',
+                    color: 'text-blue-400',
+                    code: `import requests
 
-                      {apiPlaygroundMethod === 'status' && (
-                        <div className="space-y-1.5">
-                          <label className="text-[10px] text-gray-500 block uppercase font-bold">{currentLanguage === 'TR' ? 'Sorgulanacak SiparişID' : 'SMM Order Item ID'}</label>
-                          <select
-                            className="w-full bg-[#121226] border border-white/10 rounded-xl py-2 px-3 text-[11px] text-white focus:outline-none font-mono"
-                            value={apiPlaygroundOrderId}
-                            onChange={(e) => setApiPlaygroundOrderId(e.target.value)}
-                          >
-                            {clientOrders.length === 0 ? (
-                              <option value="ORD-92812">ORD-92812 (Sanal Mock)</option>
-                            ) : (
-                              clientOrders.map(o => (
-                                <option key={o.id} value={o.id}>{o.id} - {o.serviceName.substring(0, 15)}...</option>
-                              ))
-                            )}
-                          </select>
-                        </div>
-                      )}
+API_KEY = 'bm_live_ANAHTARINIZ'
+API_URL = 'https://bormedya.com/api-v1.php'
 
+def bor_media_api(action: str, **params) -> dict:
+    payload = {'key': API_KEY, 'action': action, **params}
+    r = requests.post(API_URL, data=payload, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+services = bor_media_api('services')
+print(f"Toplam aktif servis: {len(services)}")
+
+order = bor_media_api(
+    'add_order',
+    service='101',
+    link='https://instagram.com/ornek_profil',
+    quantity=1000,
+)
+print(f"Sipariş ID: {order.get('order')}")
+
+status = bor_media_api('status', order=order['order'])
+print(f"Durum: {status.get('status')}, Kalan: {status.get('remains')}")
+
+balance = bor_media_api('balance')
+print(f"Bakiye: {balance.get('balance')} TRY")`,
+                  },
+                ].map((ex) => (
+                  <div key={ex.lang} className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-[10px] font-bold font-mono ${ex.color}`}>{ex.lang}</span>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(ex.code); showToast(`${ex.lang} kodu kopyalandı!`, 'success'); }}
+                        className="text-[9px] font-bold text-gray-600 hover:text-gray-400 cursor-pointer transition"
+                      >[ kopyala ]</button>
                     </div>
-
-                    <button
-                      onClick={executeSimulatedApi}
-                      disabled={apiResponseLoading}
-                      className="w-full py-2.5 bg-gradient-to-r from-cyan-400 to-purple-600 font-extrabold text-[#090915] text-center rounded-xl hover:text-white transition flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Play className="w-3.5 h-3.5 fill-black hover:fill-white shrink-0" />
-                      <span>{currentLanguage === 'TR' ? 'İSTEĞİ SİMÜLE ET' : 'SEND SIMULATE PACKET'}</span>
-                    </button>
+                    <pre className="bg-[#050510] rounded-xl p-4 text-[10px] font-mono text-gray-300 border border-white/5 overflow-x-auto leading-relaxed whitespace-pre-wrap">{ex.code}</pre>
                   </div>
-
-                  {/* Terminal stdout output printout */}
-                  <div className="md:col-span-7 bg-[#050512] border border-white/5 rounded-2xl p-4 flex flex-col justify-between space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between border-b border-white/5 pb-2">
-                        <span className="text-[9.5px] font-bold text-gray-500 uppercase tracking-widest block font-mono">{currentLanguage === 'TR' ? '2. GÖNDERİLEN payload & YANIT' : '2. API RESPONSE OUT'}</span>
-                        <div className="flex gap-1.5">
-                          <span className="w-2.5 h-1.5 rounded-full bg-rose-500" />
-                          <span className="w-2.5 h-1.5 rounded-full bg-yellow-500" />
-                          <span className="w-2.5 h-1.5 rounded-full bg-emerald-500" />
-                        </div>
-                      </div>
-
-                      {/* Request JSON block */}
-                      <div className="p-2.5 bg-[#09091b] rounded-lg border border-white/5 font-mono text-[9px] text-gray-400">
-                        <span className="text-gray-600 block pl-1 italic font-bold mb-1">// POST Request Header & BodyPayload:</span>
-                        <p>{`POST https://api.smmpro.com.tr/v2/action HTTP/1.1`}</p>
-                        <p className="mt-1 font-bold text-cyan-400">{`{`}</p>
-                        <p className="pl-4">"api_key": <span className="text-emerald-400">"smm_pro_partner_key_...7b2ffa9"</span>,</p>
-                        <p className="pl-4">"action": <span className="text-teal-400">"{apiPlaygroundMethod}"</span></p>
-                        {apiPlaygroundMethod === 'add_order' && (
-                          <>
-                            <p className="pl-4">,"service": <span className="text-yellow-400">{apiPlaygroundServiceId}</span></p>
-                            <p className="pl-4">,"link": <span className="text-teal-400">"{apiPlaygroundOrderLink}"</span></p>
-                            <p className="pl-4">,"quantity": <span className="text-yellow-400">{apiPlaygroundQuantity}</span></p>
-                          </>
-                        )}
-                        {apiPlaygroundMethod === 'status' && (
-                          <p className="pl-4">,"order": <span className="text-teal-400">"{apiPlaygroundOrderId}"</span></p>
-                        )}
-                        <p className="font-bold text-cyan-400">{`}`}</p>
-                      </div>
-                    </div>
-
-                    {/* Standard simulated response results */}
-                    <div className="space-y-2">
-                      <span className="text-[9px] font-mono text-gray-500 block uppercase font-bold tracking-wider">// Simulated Server Response Pipeline:</span>
-                      
-                      <div className="bg-[#03030c] rounded-lg p-3 border border-white/5 font-mono text-[9px] text-gray-300 min-h-32 flex flex-col justify-center">
-                        {apiResponseLoading ? (
-                          <div className="flex flex-col items-center justify-center space-y-2 py-4">
-                            <RefreshCw className="w-5 h-5 text-cyan-400 animate-spin" />
-                            <span className="text-cyan-400 text-[10px] tracking-widest uppercase font-bold animate-pulse">Requesting node...</span>
-                          </div>
-                        ) : apiPlaygroundResponse ? (
-                          <pre className="text-teal-400 leading-relaxed font-bold">
-                            {JSON.stringify(apiPlaygroundResponse, null, 2)}
-                          </pre>
-                        ) : (
-                          <p className="text-gray-600 italic text-center text-[10px]">
-                            {currentLanguage === 'TR' ? 'Yayımlanan veriler için soldaki butona basın.' : 'Click "SEND SIMULATE PACKET" to fire JSON response.'}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-
-                </div>
-
+                ))}
               </div>
 
-              {/* Whitelist Security section */}
+              {/* Error Codes */}
               <div className="bg-[#121226] border border-white/5 rounded-3xl p-6 space-y-4 shadow-xl">
-                
                 <div className="border-b border-white/5 pb-3">
-                  <h4 className="text-[11px] font-bold text-white uppercase tracking-wider flex items-center gap-1.5 pl-0.5">
-                    <Shield className="w-4 h-4 text-purple-400" />
-                    <span>{currentLanguage === 'TR' ? 'API Güvenlik & Whitelisted IP Yapılandırması' : 'API Node IP Security Access Controls'}</span>
+                  <h4 className="text-sm font-bold font-sora text-white flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-red-400" />
+                    <span>{currentLanguage === 'TR' ? 'Hata Kodları & Güvenlik' : 'Error Codes & Security'}</span>
                   </h4>
-                  <p className="text-xs text-slate-400">{currentLanguage === 'TR' ? 'API anahtarınızın güvenliğini artırmak için sadece belirlediğiniz sunucu IP adreslerine erişim izni tanımlayın.' : 'Restrict incoming calls exclusively to whitelisted server nodes.'}</p>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
-                  <div className="sm:col-span-8 space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">{currentLanguage === 'TR' ? 'Yetkilendirilmiş Sunucu IP Adresleri (Virgülle Ayırın)' : 'Whitelisted IP Targets'}</label>
-                    <input
-                      type="text"
-                      className="w-full bg-[#0d0d1c] border border-white/10 rounded-xl py-2.5 px-3 text-cyan-300 font-mono"
-                      value={apiIpWhitelist}
-                      onChange={(e) => setApiIpWhitelist(e.target.value)}
-                    />
-                  </div>
-                  <div className="sm:col-span-4 flex items-end">
-                    <button
-                      onClick={() => showToast(currentLanguage === 'TR' ? 'IP Whitelist başarıyla kaydedildi!' : 'IP Whitelist updated successfully.', 'success')}
-                      className="w-full py-2.5 bg-purple-950/40 border border-purple-800/45 text-purple-400 hover:text-white font-extrabold rounded-xl transition cursor-pointer"
-                    >
-                      {currentLanguage === 'TR' ? 'Birimleri Kaydet' : 'Save Whitelist'}
-                    </button>
-                  </div>
+                <div className="space-y-2">
+                  {[
+                    { err: 'API anahtarı eksik. key parametresini gönderin.', cause: currentLanguage === 'TR' ? 'key parametresi eksik' : 'Missing key parameter' },
+                    { err: 'Geçersiz API anahtarı.', cause: currentLanguage === 'TR' ? 'Yanlış veya yenilenmiş anahtar' : 'Wrong or regenerated key' },
+                    { err: 'Hesabınız askıya alınmış.', cause: currentLanguage === 'TR' ? 'Admin tarafından durdurulmuş' : 'Suspended by admin' },
+                    { err: 'Zorunlu parametreler eksik: service, link, quantity', cause: currentLanguage === 'TR' ? 'add_order için eksik alan' : 'Missing field for add_order' },
+                    { err: 'Yetersiz bakiye.', cause: currentLanguage === 'TR' ? 'Bakiye yetersiz' : 'Insufficient balance' },
+                    { err: 'Miktar X ile Y arasında olmalıdır.', cause: currentLanguage === 'TR' ? 'Miktar min/max dışında' : 'Quantity out of range' },
+                  ].map((e, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-[#0d0d1c] rounded-xl border border-white/5">
+                      <code className="text-red-400 font-mono text-[10px] flex-1">"{e.err}"</code>
+                      <span className="text-gray-500 text-[10px] shrink-0">{e.cause}</span>
+                    </div>
+                  ))}
                 </div>
-
+                <div className="p-3 bg-blue-950/30 border border-blue-700/30 rounded-xl">
+                  <p className="text-[10px] text-blue-300">💡 {currentLanguage === 'TR' ? 'Tüm hatalar {"error": "mesaj"} formatında döner.' : 'All errors return as {"error": "message"}.'}</p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  {[
+                    { icon: '🔑', tip: currentLanguage === 'TR' ? 'API anahtarınızı asla client-side kodunda kullanmayın. Sadece sunucu tarafında (PHP/Python/Node.js) çalıştırın.' : 'Never expose your API key in client-side code. Use it only server-side (PHP/Python/Node.js).' },
+                    { icon: '🔄', tip: currentLanguage === 'TR' ? 'Anahtarınız sızdıysa hemen "Yenile" butonuna basın. Eski anahtar anında geçersiz olur.' : 'If your key is leaked, regenerate immediately. The old key is instantly invalidated.' },
+                    { icon: '💰', tip: currentLanguage === 'TR' ? 'Otomatik sistemlerde sipariş vermeden önce balance action ile bakiye kontrolü yapın.' : 'In automated systems, always check balance before placing orders.' },
+                    { icon: '⚡', tip: currentLanguage === 'TR' ? 'Saniyede 10\'dan fazla istek atmayın, rate limit uygulanabilir.' : 'Do not exceed 10 requests per second to avoid rate limiting.' },
+                  ].map((t, i) => (
+                    <div key={i} className="flex items-start gap-3 p-3 bg-[#0d0d1c] rounded-xl border border-white/5">
+                      <span className="text-base shrink-0">{t.icon}</span>
+                      <p className="text-[11px] text-gray-400 leading-relaxed">{t.tip}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
+
 
             </div>
           )}
