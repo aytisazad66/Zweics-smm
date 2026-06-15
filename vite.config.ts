@@ -895,7 +895,7 @@ function copyFilesAfterBuild(): Plugin {
   return {
     name: 'copy-cpanel-files',
     closeBundle() {
-      const files = ['public/.htaccess', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php', 'public/api-v1.php'];
+      const files = ['public/.htaccess', 'public/favicon.svg', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php', 'public/api-v1.php'];
       for (const src of files) {
         const dest = `dist/${path.basename(src)}`;
         if (fs.existsSync(src)) {
