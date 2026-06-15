@@ -18,8 +18,10 @@ RewriteRule ^api/kv/([a-zA-Z0-9_]+)$ api-kv.php?key=$1 [L,QSA]
 RewriteRule ^api/mail$ api-mail.php [L,QSA]
 
 # /api/auth/* → PHP auth
-RewriteRule ^api/auth/login$           api-auth.php?action=login           [L,QSA]
-RewriteRule ^api/auth/set-credentials$ api-auth.php?action=set-credentials [L,QSA]
+RewriteRule ^api/auth/login$                api-auth.php?action=login                [L,QSA]
+RewriteRule ^api/auth/set-credentials$      api-auth.php?action=set-credentials      [L,QSA]
+RewriteRule ^api/auth/google/config$        api-auth.php?action=google_config        [L,QSA]
+RewriteRule ^api/auth/google/callback$      api-auth.php?action=google_callback      [L,QSA]
 
 # /api/shopier/* → PHP Shopier handler
 RewriteRule ^api/shopier/create-product$   api-shopier.php/create-product   [L,QSA]
