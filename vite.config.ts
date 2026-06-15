@@ -450,6 +450,14 @@ function kvStorePlugin(): Plugin {
 
       server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: () => void) => {
         if (!req.url?.startsWith('/api/kv/')) { next(); return; }
+        // Security: require X-Requested-With header (blocks bots/crawlers)
+        const xrw = (req.headers['x-requested-with'] || '').toString().toLowerCase();
+        if (xrw !== 'xmlhttprequest') {
+          res.setHeader('Content-Type', 'application/json');
+          res.writeHead(403);
+          res.end(JSON.stringify({ error: 'Direct access forbidden' }));
+          return;
+        }
         const key = req.url.replace('/api/kv/', '').split('?')[0];
         const safeKey = key.replace(/[^a-zA-Z0-9_]/g, '');
         if (!safeKey) { res.writeHead(400); res.end(JSON.stringify({ error: 'Invalid key' })); return; }
@@ -895,7 +903,7 @@ function copyFilesAfterBuild(): Plugin {
   return {
     name: 'copy-cpanel-files',
     closeBundle() {
-      const files = ['public/.htaccess', 'public/favicon.svg', 'public/favicon.png', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php', 'public/api-v1.php'];
+      const files = ['public/.htaccess', 'public/robots.txt', 'public/favicon.svg', 'public/favicon.png', 'public/api-proxy.php', 'public/api-kv.php', 'public/api-mail.php', 'public/api-auth.php', 'public/api-shopier.php', 'public/api-v1.php'];
       for (const src of files) {
         const dest = `dist/${path.basename(src)}`;
         if (fs.existsSync(src)) {

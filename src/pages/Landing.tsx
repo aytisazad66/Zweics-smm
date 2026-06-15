@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppState } from '../context/AppContext';
+import { kvGet, kvPost } from '../utils/kvApi';
 import { BorMediaLogo } from '../components/BorMediaLogo';
 import { 
   Zap, 
@@ -85,11 +86,8 @@ export const Landing: React.FC = () => {
     let foundUser: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
     if (!foundUser) {
       try {
-        const res = await fetch('/api/kv/smm_users');
-        if (res.ok) {
-          const d = await res.json();
-          if (d.value) foundUser = JSON.parse(d.value).find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
-        }
+        const d = await kvGet('smm_users');
+        if (d?.value) foundUser = JSON.parse(d.value).find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
       } catch {}
     }
 
@@ -103,11 +101,7 @@ export const Landing: React.FC = () => {
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     const expiry = Date.now() + 10 * 60 * 1000; // 10 min
     try {
-      await fetch('/api/kv/' + otpKey(forgotEmail), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: JSON.stringify({ otp, expiry }) })
-      });
+      await kvPost(otpKey(forgotEmail), { value: JSON.stringify({ otp, expiry }) });
     } catch {}
 
     // Try to send email
@@ -172,9 +166,8 @@ export const Landing: React.FC = () => {
     setForgotOtpError(false);
     try {
       const key = otpKey(forgotEmail);
-      const res = await fetch('/api/kv/' + key);
-      if (res.ok) {
-        const d = await res.json();
+      const d = await kvGet(key);
+      if (d) {
         if (d.value) {
           const { otp, expiry } = JSON.parse(d.value);
           if (Date.now() > expiry) {
@@ -186,12 +179,12 @@ export const Landing: React.FC = () => {
           }
           if (forgotOtpInput === otp) {
             // Delete OTP from KV
-            fetch('/api/kv/' + key, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: null }) }).catch(() => {});
+            kvPost(key, { value: null });
             // Find user
             let u: any = users.find((u: any) => u.email.toLowerCase() === forgotEmail.toLowerCase());
             if (!u) {
-              const r2 = await fetch('/api/kv/smm_users');
-              if (r2.ok) { const d2 = await r2.json(); if (d2.value) u = JSON.parse(d2.value).find((x: any) => x.email.toLowerCase() === forgotEmail.toLowerCase()); }
+              const d2 = await kvGet('smm_users');
+              if (d2?.value) u = JSON.parse(d2.value).find((x: any) => x.email.toLowerCase() === forgotEmail.toLowerCase());
             }
             setForgotOtpLoading(false);
             if (u) {
@@ -318,7 +311,7 @@ export const Landing: React.FC = () => {
       if (user && user.status !== 'suspended') {
         doLogin(user);
       } else if (!user) {
-        fetch('/api/kv/smm_users').then(r => r.json()).then(d => {
+        kvGet('smm_users').then(d => {
           if (d.value) {
             const fresh = JSON.parse(d.value);
             const u = fresh.find((x: any) => x.id === gauthUid);
@@ -399,11 +392,7 @@ export const Landing: React.FC = () => {
     // Store OTP on server with 10-min expiry
     const safeEmail = authEmail.replace(/[^a-zA-Z0-9_]/g, '_');
     try {
-      await fetch(`/api/kv/smm_otp_${safeEmail}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: JSON.stringify({ code, expiry: Date.now() + 600_000 }) })
-      });
+      await kvPost(`smm_otp_${safeEmail}`, { value: JSON.stringify({ code, expiry: Date.now() + 600_000 }) });
     } catch {}
     const smtpReady = !!(smtpConfig?.host && smtpConfig?.user && smtpConfig?.pass);
     if (!smtpReady) {
@@ -484,10 +473,9 @@ export const Landing: React.FC = () => {
       // 2. Fallback: fetch directly from server (handles race condition on new devices)
       setAuthLoading(true);
       try {
-        const res = await fetch('/api/kv/smm_users');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.value) {
+        const data = await kvGet('smm_users');
+        if (data?.value) {
+          {
             const serverUsers: any[] = JSON.parse(data.value);
             const serverUser = serverUsers.find((u: any) => u.email.toLowerCase() === email);
             if (serverUser) {

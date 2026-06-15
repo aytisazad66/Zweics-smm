@@ -9,7 +9,9 @@ RewriteRule ^api-mail\.php$    - [L]
 RewriteRule ^api-auth\.php$    - [L]
 RewriteRule ^api-shopier\.php$ - [L]
 
-# /api/kv/{key} → KV store
+# /api/kv/{key} → KV store — yalnızca panel içi (X-Requested-With) istekler
+RewriteCond %{HTTP:X-Requested-With} !^XMLHttpRequest$ [NC]
+RewriteRule ^api/kv/ - [F,L]
 RewriteRule ^api/kv/([a-zA-Z0-9_]+)$ api-kv.php?key=$1 [L,QSA]
 
 # /api/mail → PHP mailer

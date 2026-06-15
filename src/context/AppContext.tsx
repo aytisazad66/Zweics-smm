@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { kvGet, kvPost } from '../utils/kvApi';
 import {
   Service,
   Order,
@@ -166,11 +167,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const saveToApi = (key: string, value: unknown) => {
     if (!syncDoneRef.current) return;
-    fetch(`/api/kv/${key}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ value: JSON.stringify(value) })
-    }).catch(() => {});
+    kvPost(key, { value: JSON.stringify(value) });
   };
 
   // Persistent Storage — KV store only (no localStorage)
@@ -223,9 +220,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       let loadedUsers: User[] | null = null;
       for (const [key, setter] of entries) {
         try {
-          const res = await fetch(`/api/kv/${key}`);
-          if (res.ok) {
-            const data = await res.json();
+          const data = await kvGet(key);
+          if (data) {
             if (data.value) {
               const parsed = JSON.parse(data.value);
               setter(parsed);
@@ -237,29 +233,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Load announcement text
       try {
-        const annRes = await fetch('/api/kv/smm_announcement');
-        if (annRes.ok) {
-          const annData = await annRes.json();
-          if (annData.value) setAnnouncementText(JSON.parse(annData.value));
-        }
+        const annData = await kvGet('smm_announcement');
+        if (annData?.value) setAnnouncementText(JSON.parse(annData.value));
       } catch {}
 
       // Load SMTP config
       try {
-        const smtpRes = await fetch('/api/kv/smm_smtp_config');
-        if (smtpRes.ok) {
-          const smtpData = await smtpRes.json();
-          if (smtpData.value) setSmtpConfig(JSON.parse(smtpData.value));
-        }
+        const smtpData = await kvGet('smm_smtp_config');
+        if (smtpData?.value) setSmtpConfig(JSON.parse(smtpData.value));
       } catch {}
 
       // Load admin notifications from KV
       try {
-        const notifRes = await fetch('/api/kv/smm_notifications');
-        if (notifRes.ok) {
-          const notifData = await notifRes.json();
-          if (notifData.value) setNotifications(JSON.parse(notifData.value));
-        }
+        const notifData = await kvGet('smm_notifications');
+        if (notifData?.value) setNotifications(JSON.parse(notifData.value));
       } catch {}
 
       // Restore client session: try from KV users, fallback to sessionStorage cache
@@ -371,10 +358,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const interval = setInterval(async () => {
       if (!clientLoggedInRef.current || !currentClientUserRef.current) return;
       try {
-        const res = await fetch('/api/kv/smm_users');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (!data.value) return;
+        const data = await kvGet('smm_users');
+        if (!data?.value) return;
         const freshUsers: User[] = JSON.parse(data.value);
         const freshUser = freshUsers.find(u => u.id === currentClientUserRef.current!.id);
         if (!freshUser || freshUser.status === 'suspended') {

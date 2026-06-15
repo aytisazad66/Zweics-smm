@@ -5,22 +5,41 @@
  * POST /api/kv/{key}  → JSON veri kaydeder
  */
 
-// Büyük servis listesi (1-2MB) yazabilmek için PHP limitlerini yükselt
 @ini_set('post_max_size',       '32M');
 @ini_set('upload_max_filesize', '32M');
 @ini_set('memory_limit',        '128M');
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Headers: Content-Type, X-Requested-With');
 header('Cache-Control: no-store, no-cache');
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+
+// ── Güvenlik: Yalnızca panel içi istekler (X-Requested-With) kabul edilir ──
+$xrw = isset($_SERVER['HTTP_X_REQUESTED_WITH']) ? strtolower(trim($_SERVER['HTTP_X_REQUESTED_WITH'])) : '';
+if ($xrw !== 'xmlhttprequest') {
+    http_response_code(403);
+    echo json_encode(['error' => 'Direct access forbidden']);
+    exit;
+}
 
 $key = isset($_GET['key']) ? preg_replace('/[^a-zA-Z0-9_]/', '', trim($_GET['key'])) : '';
 
 if (!$key) {
     http_response_code(400);
     echo json_encode(['error' => 'Invalid or missing key']);
+    exit;
+}
+
+// ── Hassas anahtarlar: GET isteğiyle hiçbir zaman dışarıya verilmez ──
+$BLOCKED_GET_KEYS = [
+    'smm_admin_credentials',
+];
+
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && in_array($key, $BLOCKED_GET_KEYS, true)) {
+    http_response_code(403);
+    echo json_encode(['error' => 'Access denied']);
     exit;
 }
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppState } from '../context/AppContext';
+import { kvGet, kvPost } from '../utils/kvApi';
 import { Settings as SettingsIcon, Mail, Laptop, ShieldCheck, Save, Send, AlertTriangle, RefreshCw, Eye, EyeOff, KeyRound, Link } from 'lucide-react';
 
 export const Settings: React.FC = () => {
@@ -33,10 +34,9 @@ export const Settings: React.FC = () => {
   const [googleLoaded, setGoogleLoaded] = useState(false);
 
   useEffect(() => {
-    fetch('/api/kv/smm_google_oauth_config')
-      .then(r => r.json())
+    kvGet('smm_google_oauth_config')
       .then(d => {
-        if (d.value) {
+        if (d?.value) {
           try {
             const cfg = JSON.parse(d.value);
             setGoogleEnabled(!!cfg.enabled);
@@ -56,23 +56,14 @@ export const Settings: React.FC = () => {
     }
     setSavingGoogle(true);
     try {
-      const res = await fetch('/api/kv/smm_google_oauth_config', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          value: JSON.stringify({
-            enabled: googleEnabled,
-            clientId: googleClientId.trim(),
-            clientSecret: googleClientSecret.trim(),
-          }),
+      await kvPost('smm_google_oauth_config', {
+        value: JSON.stringify({
+          enabled: googleEnabled,
+          clientId: googleClientId.trim(),
+          clientSecret: googleClientSecret.trim(),
         }),
       });
-      const data = await res.json();
-      if (data.ok) {
-        showToast('Google OAuth ayarları kaydedildi!', 'success');
-      } else {
-        showToast('Kayıt başarısız.', 'error');
-      }
+      showToast('Google OAuth ayarları kaydedildi!', 'success');
     } catch {
       showToast('Sunucuya bağlanılamadı.', 'error');
     } finally {
