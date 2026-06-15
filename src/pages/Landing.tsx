@@ -558,7 +558,7 @@ export const Landing: React.FC = () => {
               {currentLanguage === 'TR' ? 'Hizmetler & Fiyatlar' : 'Services & Catalog'}
             </a>
             <a href="#features-sec" className="hover:text-[#00D4FF] transition-colors">
-              {currentLanguage === 'TR' ? 'Neden Biz?' : 'Why SMM Pro?'}
+              {currentLanguage === 'TR' ? 'Neden Biz?' : 'Why Bor Medya?'}
             </a>
             <a href="#api-sec" className="hover:text-[#00D4FF] transition-colors">
               {currentLanguage === 'TR' ? 'API Entegrasyonu' : 'Reseller API'}
@@ -633,7 +633,7 @@ export const Landing: React.FC = () => {
               {currentLanguage === 'TR' ? 'Hizmetler & Fiyatlar' : 'Services & Catalog'}
             </a>
             <a href="#features-sec" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
-              {currentLanguage === 'TR' ? 'Neden Biz?' : 'Why SMM Pro?'}
+              {currentLanguage === 'TR' ? 'Neden Biz?' : 'Why Bor Medya?'}
             </a>
             <a href="#api-sec" onClick={() => setMobileMenuOpen(false)} className="py-2 border-b border-white/5 hover:text-[#00D4FF]">
               {currentLanguage === 'TR' ? 'API Entegrasyonu' : 'Reseller API'}
@@ -922,7 +922,7 @@ export const Landing: React.FC = () => {
             </h2>
             <p className="text-sm text-gray-400 leading-relaxed">
               {currentLanguage === 'TR' 
-                ? 'SMM Pro Group Turkey markası olarak, kendi panelini veya yazılıp bayiliğini yürütmek isteyen müşterilerimize sınırsız hacimde, donmasız ve anında teslim garantili servis sağlıyoruz.'
+                ? 'Bor Medya markası olarak, kendi panelini veya yazılım bayiliğini yürütmek isteyen müşterilerimize sınırsız hacimde, donmasız ve anında teslim garantili servis sağlıyoruz.'
                 : 'Enjoy infinite scale capabilities, complete server protection patterns, and near zero lag. We keep standard operations working 24/7 with immediate response parameters.'}
             </p>
 
@@ -944,38 +944,6 @@ export const Landing: React.FC = () => {
             </div>
           </div>
 
-          <div className="bg-[#121226]/50 border border-white/10 rounded-3xl p-6 relative overflow-hidden group hover:border-cyan-400/20 transition duration-300">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4 mb-5 text-[11px]">
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-500" />
-                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-gray-500">api-endpoint-v2.json</span>
-                <span className="px-2 py-0.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-400 text-[9px] font-bold rounded-full uppercase tracking-wider">Yakında...</span>
-              </div>
-            </div>
-
-            <pre className="font-mono text-[10.5px] leading-relaxed text-indigo-300 overflow-x-auto select-all">
-{`{
-  "api_action": "place_order",
-  "api_key": "",
-  "service_id": 101,
-  "service_quantity": 2500,
-  "link": "https://instagram.com/salihmusic",
-  "delivery_agent": "instant_auto"
-}
-
-// HTTP POST RESPONSE:
-{
-  "status": "success",
-  "order_id": "ORD-50124",
-  "charged_balance": "106.25 TL",
-  "remaining_balance": "1393.75 TL"
-}`}
-            </pre>
-          </div>
         </div>
       </section>
 
@@ -1151,9 +1119,9 @@ print(order['order'])  # ORD-00042`,
       <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 border-t border-white/5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[
-            { name: 'Kerem Yılmaz', role: 'Ajans Sahibi', comment: 'PayTR entegrasyonu sayesinde saniyeler içinde cüzdanımızı doldurup sipariş geçiyoruz. 10 saniyede takipçiler yüklenmeye başlıyor.', score: 5 },
+            { name: 'Kerem Yılmaz', role: 'Ajans Sahibi', comment: 'Shopier Pos entegrasyonu sayesinde saniyeler içinde cüzdanımızı doldurup sipariş geçiyoruz. 10 saniyede takipçiler yüklenmeye başlıyor.', score: 5 },
             { name: 'Ezgi Şen', role: 'Sosyal Medya Danışmanı', comment: 'Sürekli müşterilerimin hesaplarını buradaki Türk Organik servisiyle destekledim. Düşüş yok denecek kadar az. Harika bir panel!', score: 5 },
-            { name: 'Murat Aras', role: 'Yazılımcı / Reseller', comment: 'API dokümantasyonu o kadar temiz ki kendi Python scriptlerimle 5 dakikada entegrasyon sağladım. Teşekkürler SMM Pro!', score: 5 },
+            { name: 'Murat Aras', role: 'Yazılımcı / Reseller', comment: 'API dokümantasyonu o kadar temiz ki kendi Python scriptlerimle 5 dakikada entegrasyon sağladım. Teşekkürler Bor Medya!', score: 5 },
           ].map((testi, idx) => (
             <div key={idx} className="bg-[#121226]/50 border border-white/5 rounded-3xl p-5 space-y-3">
               <div className="flex items-center gap-1.5 text-yellow-500">
