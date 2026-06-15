@@ -211,8 +211,14 @@ export const Landing: React.FC = () => {
   };
 
   const handleForgotSetPassword = async () => {
-    if (!forgotNewPass || forgotNewPass.length < 6) {
-      showToast(currentLanguage === 'TR' ? 'Şifre en az 6 karakter olmalı.' : 'Password must be at least 6 characters.', 'error');
+    const passCheck = validatePasswordStrength(forgotNewPass);
+    if (!forgotNewPass || !passCheck.valid) {
+      showToast(
+        currentLanguage === 'TR'
+          ? `Şifre gereksinimleri karşılanmıyor: ${passCheck.errors.join(', ')}`
+          : `Password requirements not met: ${passCheck.errors.join(', ')}`,
+        'error'
+      );
       return;
     }
     if (forgotNewPass !== forgotNewPass2) {
@@ -355,9 +361,28 @@ export const Landing: React.FC = () => {
     showToast(currentLanguage === 'TR' ? `Tekrar hoş geldiniz, Sayın ${user.fullName}!` : `Welcome back, ${user.fullName}!`, 'success');
   };
 
+  const validatePasswordStrength = (pass: string): { valid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+    if (pass.length < 8) errors.push(currentLanguage === 'TR' ? 'En az 8 karakter' : 'At least 8 characters');
+    if (!/[A-Z]/.test(pass)) errors.push(currentLanguage === 'TR' ? 'En az 1 büyük harf' : 'At least 1 uppercase letter');
+    if (!/[0-9]/.test(pass)) errors.push(currentLanguage === 'TR' ? 'En az 1 rakam' : 'At least 1 number');
+    if (!/[^a-zA-Z0-9]/.test(pass)) errors.push(currentLanguage === 'TR' ? 'En az 1 özel karakter (!@#$...)' : 'At least 1 special character');
+    return { valid: errors.length === 0, errors };
+  };
+
   const handleSendRegOtp = async () => {
     if (!authFullName || !authEmail || !authPassword) {
       showToast(currentLanguage === 'TR' ? 'Lütfen tüm alanları doldurun.' : 'Please fill all fields.', 'error');
+      return;
+    }
+    const passCheck = validatePasswordStrength(authPassword);
+    if (!passCheck.valid) {
+      showToast(
+        currentLanguage === 'TR'
+          ? `Şifre gereksinimleri karşılanmıyor: ${passCheck.errors.join(', ')}`
+          : `Password requirements not met: ${passCheck.errors.join(', ')}`,
+        'error'
+      );
       return;
     }
     // Check if email already in use
@@ -425,7 +450,7 @@ export const Landing: React.FC = () => {
       return;
     }
     setRegOtpError('');
-    const success = registerClient(authFullName, authEmail);
+    const success = registerClient(authFullName, authEmail, authPassword);
     if (success) {
       setRegOtpStep(false);
       setAuthModalOpen(false);
@@ -1086,7 +1111,7 @@ export const Landing: React.FC = () => {
                       <input
                         type="password"
                         className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                        placeholder={currentLanguage === 'TR' ? 'En az 6 karakter' : 'At least 6 characters'}
+                        placeholder={currentLanguage === 'TR' ? 'Büyük harf, rakam ve özel karakter içermeli' : 'Include uppercase, number & special character'}
                         value={forgotNewPass}
                         onChange={(e) => setForgotNewPass(e.target.value)}
                       />
@@ -1106,7 +1131,7 @@ export const Landing: React.FC = () => {
                     </div>
                     <button
                       type="button"
-                      disabled={!forgotNewPass || forgotNewPass.length < 6 || forgotNewPass !== forgotNewPass2 || forgotNewPassLoading}
+                      disabled={!forgotNewPass || !validatePasswordStrength(forgotNewPass).valid || forgotNewPass !== forgotNewPass2 || forgotNewPassLoading}
                       onClick={handleForgotSetPassword}
                       className="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-cyan-500 text-white text-xs font-bold rounded-xl shadow-lg active:scale-95 transition-all cursor-pointer flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                     >
@@ -1274,7 +1299,7 @@ export const Landing: React.FC = () => {
                       type="text"
                       required
                       className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                      placeholder="örn: Salih Music"
+                      placeholder={currentLanguage === 'TR' ? 'İsim Soyisim' : 'Full Name'}
                       value={authFullName}
                       onChange={(e) => setAuthFullName(e.target.value)}
                     />
@@ -1287,7 +1312,7 @@ export const Landing: React.FC = () => {
                     type="email"
                     required
                     className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                    placeholder="örn: salihmusicinc@gmail.com"
+                    placeholder={currentLanguage === 'TR' ? 'E-posta Giriniz' : 'Enter your email'}
                     value={authEmail}
                     onChange={(e) => setAuthEmail(e.target.value)}
                   />
@@ -1310,10 +1335,36 @@ export const Landing: React.FC = () => {
                     type="password"
                     required
                     className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-400"
-                    placeholder="••••••••"
+                    placeholder={authTab === 'register' ? (currentLanguage === 'TR' ? 'Güçlü şifre oluşturun' : 'Create a strong password') : '••••••••'}
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
                   />
+                  {authTab === 'register' && authPassword.length > 0 && (() => {
+                    const checks = [
+                      { label: currentLanguage === 'TR' ? 'En az 8 karakter' : 'Min. 8 characters', ok: authPassword.length >= 8 },
+                      { label: currentLanguage === 'TR' ? 'Büyük harf' : 'Uppercase letter', ok: /[A-Z]/.test(authPassword) },
+                      { label: currentLanguage === 'TR' ? 'Rakam' : 'Number', ok: /[0-9]/.test(authPassword) },
+                      { label: currentLanguage === 'TR' ? 'Özel karakter (!@#$...)' : 'Special character', ok: /[^a-zA-Z0-9]/.test(authPassword) },
+                    ];
+                    const score = checks.filter(c => c.ok).length;
+                    const barColor = score <= 1 ? 'bg-red-500' : score === 2 ? 'bg-orange-500' : score === 3 ? 'bg-yellow-500' : 'bg-emerald-500';
+                    return (
+                      <div className="space-y-2 pt-1">
+                        <div className="flex gap-1">
+                          {[1,2,3,4].map(i => (
+                            <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= score ? barColor : 'bg-white/10'}`} />
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+                          {checks.map((c, i) => (
+                            <span key={i} className={`text-[10px] flex items-center gap-1 font-semibold ${c.ok ? 'text-emerald-400' : 'text-gray-500'}`}>
+                              <span>{c.ok ? '✓' : '○'}</span> {c.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 <button

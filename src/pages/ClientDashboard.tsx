@@ -471,6 +471,9 @@ export const ClientDashboard: React.FC = () => {
     const isStory = n.includes('hikaye') || n.includes('story');
     const isReels = n.includes('reels') || n.includes('reel') || n.includes('kısa video');
     const isVideo = n.includes('izlenme') || n.includes('view') || n.includes('watch') || (n.includes('video') && !isReels);
+    const isLive = n.includes('canlı') || n.includes('live') || n.includes('stream') || n.includes('yayın izlenme') || n.includes('yayın beğeni') || n.includes('yayın yorum');
+    const isClip = n.includes('clip') || n.includes('klip');
+    const isEngagement = n.includes('beğeni') || n.includes('like') || n.includes('yorum') || n.includes('comment');
 
     if (isFollower && platform !== 'YouTube') {
       return {
@@ -492,12 +495,14 @@ export const ClientDashboard: React.FC = () => {
     } else if (isReels) {
       linkLabel = currentLanguage === 'TR' ? 'Reels / Kısa Video Linki' : 'Reels Link';
       linkPlaceholder = 'https://www.instagram.com/reel/XXXXXXXXXXX/';
-    } else if (platform === 'YouTube' && (isFollower || !isVideo)) {
-      linkLabel = currentLanguage === 'TR' ? 'YouTube Kanal Linki' : 'YouTube Channel Link';
-      linkPlaceholder = 'https://www.youtube.com/@kanaladi';
-    } else if (platform === 'YouTube' && isVideo) {
-      linkLabel = currentLanguage === 'TR' ? 'YouTube Video Linki' : 'YouTube Video Link';
-      linkPlaceholder = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
+    } else if (platform === 'YouTube') {
+      if (isFollower) {
+        linkLabel = currentLanguage === 'TR' ? 'YouTube Kanal Linki' : 'YouTube Channel Link';
+        linkPlaceholder = 'https://www.youtube.com/@kanaladi';
+      } else {
+        linkLabel = currentLanguage === 'TR' ? 'YouTube Video Linki' : 'YouTube Video Link';
+        linkPlaceholder = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
+      }
     } else if (platform === 'TikTok' && isVideo) {
       linkLabel = currentLanguage === 'TR' ? 'TikTok Video Linki' : 'TikTok Video Link';
       linkPlaceholder = 'https://www.tiktok.com/@kullanici/video/1234567890';
@@ -511,14 +516,35 @@ export const ClientDashboard: React.FC = () => {
       linkLabel = currentLanguage === 'TR' ? 'Instagram Gönderi Linki' : 'Instagram Post Link';
       linkPlaceholder = 'https://www.instagram.com/p/XXXXXXXXXXX/';
     } else if (platform === 'Kick') {
-      linkLabel = currentLanguage === 'TR' ? 'Kick Kanal / Yayın Linki' : 'Kick Channel / Stream Link';
-      linkPlaceholder = 'https://kick.com/kanaladi';
+      if (isLive) {
+        linkLabel = currentLanguage === 'TR' ? 'Kick Yayın Linki' : 'Kick Stream Link';
+        linkPlaceholder = 'https://kick.com/kanaladi';
+      } else if (isClip) {
+        linkLabel = currentLanguage === 'TR' ? 'Kick Clip Linki' : 'Kick Clip Link';
+        linkPlaceholder = 'https://kick.com/kanaladi/clip/...';
+      } else {
+        linkLabel = currentLanguage === 'TR' ? 'Kick Kanal Linki' : 'Kick Channel Link';
+        linkPlaceholder = 'https://kick.com/kanaladi';
+      }
     } else if (platform === 'Twitch') {
-      linkLabel = currentLanguage === 'TR' ? 'Twitch Kanal / Yayın Linki' : 'Twitch Channel / Stream Link';
-      linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+      if (isLive) {
+        linkLabel = currentLanguage === 'TR' ? 'Twitch Yayın Linki' : 'Twitch Stream Link';
+        linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+      } else if (isClip) {
+        linkLabel = currentLanguage === 'TR' ? 'Twitch Clip Linki' : 'Twitch Clip Link';
+        linkPlaceholder = 'https://clips.twitch.tv/...';
+      } else {
+        linkLabel = currentLanguage === 'TR' ? 'Twitch Kanal Linki' : 'Twitch Channel Link';
+        linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+      }
     } else if (platform === 'LinkedIn') {
-      linkLabel = currentLanguage === 'TR' ? 'LinkedIn Profil / Gönderi Linki' : 'LinkedIn Profile / Post Link';
-      linkPlaceholder = 'https://www.linkedin.com/in/kullaniciadi';
+      if (isEngagement) {
+        linkLabel = currentLanguage === 'TR' ? 'LinkedIn Gönderi Linki' : 'LinkedIn Post Link';
+        linkPlaceholder = 'https://www.linkedin.com/posts/...';
+      } else {
+        linkLabel = currentLanguage === 'TR' ? 'LinkedIn Profil Linki' : 'LinkedIn Profile Link';
+        linkPlaceholder = 'https://www.linkedin.com/in/kullaniciadi';
+      }
     } else if (platform === 'Reddit') {
       linkLabel = currentLanguage === 'TR' ? 'Reddit Gönderi / Profil Linki' : 'Reddit Post / Profile Link';
       linkPlaceholder = 'https://www.reddit.com/r/subreddit/...';
@@ -1713,6 +1739,15 @@ export const ClientDashboard: React.FC = () => {
                         />
                       </div>
                       <p className="text-[10px] text-gray-600">@ işareti olmadan sadece kullanıcı adını girin.</p>
+                      <div className="flex items-start gap-2.5 bg-amber-950/20 border border-amber-500/25 rounded-xl px-4 py-3 mt-1">
+                        <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                        <p className="text-[11px] text-amber-300 leading-relaxed">
+                          <span className="font-bold">{currentLanguage === 'TR' ? 'Güvenli Teslimat:' : 'Safe Delivery:'}</span>{' '}
+                          {currentLanguage === 'TR'
+                            ? 'Hesabınızın güvenliği için takipçi / abone siparişleri 1–12 saat içinde tamamlanmaktadır.'
+                            : 'For account safety, follower / subscriber orders are completed within 1–12 hours.'}
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <div className="space-y-1.5">
@@ -1732,6 +1767,20 @@ export const ClientDashboard: React.FC = () => {
                         <p className="text-[10px] text-red-400 font-bold flex items-center gap-1">
                           ⚠ {validateOrderLink(orderLink, activeServiceObj?.platform || '')}
                         </p>
+                      )}
+                      {activeServiceObj && (() => {
+                        const n = activeServiceObj.name.toLowerCase();
+                        return n.includes('takipçi') || n.includes('abone') || n.includes('follower') || n.includes('subscriber');
+                      })() && (
+                        <div className="flex items-start gap-2.5 bg-amber-950/20 border border-amber-500/25 rounded-xl px-4 py-3">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <p className="text-[11px] text-amber-300 leading-relaxed">
+                            <span className="font-bold">{currentLanguage === 'TR' ? 'Güvenli Teslimat:' : 'Safe Delivery:'}</span>{' '}
+                            {currentLanguage === 'TR'
+                              ? 'Hesabınızın güvenliği için takipçi / abone siparişleri 1–12 saat içinde tamamlanmaktadır.'
+                              : 'For account safety, follower / subscriber orders are completed within 1–12 hours.'}
+                          </p>
+                        </div>
                       )}
                     </div>
                   )}

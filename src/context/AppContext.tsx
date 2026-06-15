@@ -109,7 +109,7 @@ interface AppContextProps {
   setCurrentClientUser: (user: User | null) => void;
   clientLoggedIn: boolean;
   setClientLoggedIn: (val: boolean) => void;
-  registerClient: (fullName: string, email: string) => boolean;
+  registerClient: (fullName: string, email: string, password?: string) => boolean;
   placeClientOrder: (serviceId: string, quantity: number, link: string, username: string) => Promise<string | null>;
   submitClientPaymentRequest: (amount: number, methodId: string) => void;
   submitClientTicket: (subject: string, message: string, priority: 'Düşük' | 'Orta' | 'Yüksek') => void;
@@ -1095,7 +1095,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const registerClient = (fullName: string, email: string): boolean => {
+  const registerClient = (fullName: string, email: string, password?: string): boolean => {
     const exists = users.some(u => u.email.toLowerCase() === email.toLowerCase());
     if (exists) {
       showToast(currentLanguage === 'TR' ? 'Bu e-posta adresiyle zaten bir hesap var.' : 'This email is already in use.', 'error');
@@ -1106,6 +1106,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id: newId,
       fullName,
       email,
+      password: password || undefined,
       balance: 0,
       totalOrders: 0,
       joinedDate: new Date().toISOString().split('T')[0],
