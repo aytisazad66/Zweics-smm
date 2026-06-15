@@ -482,7 +482,7 @@ export const ClientDashboard: React.FC = () => {
         linkLabel: '',
         linkPlaceholder: '',
         usernameLabel: currentLanguage === 'TR' ? 'Kullanıcı Adı (@ olmadan)' : 'Username (without @)',
-        usernamePlaceholder: platform === 'Telegram' ? 'kanaladi' : 'ornekkullanici',
+        usernamePlaceholder: platform === 'Telegram' ? 'ornek_kanal' : 'ornek_kullanici',
       };
     }
 
@@ -498,7 +498,7 @@ export const ClientDashboard: React.FC = () => {
     } else if (platform === 'YouTube') {
       if (isFollower) {
         linkLabel = currentLanguage === 'TR' ? 'YouTube Kanal Linki' : 'YouTube Channel Link';
-        linkPlaceholder = 'https://www.youtube.com/@kanaladi';
+        linkPlaceholder = 'https://www.youtube.com/@ornek_kanal';
       } else {
         linkLabel = currentLanguage === 'TR' ? 'YouTube Video Linki' : 'YouTube Video Link';
         linkPlaceholder = 'https://www.youtube.com/watch?v=XXXXXXXXXXX';
@@ -508,7 +508,7 @@ export const ClientDashboard: React.FC = () => {
       linkPlaceholder = 'https://www.tiktok.com/@kullanici/video/1234567890';
     } else if (platform === 'Telegram') {
       linkLabel = currentLanguage === 'TR' ? 'Telegram Kanal / Grup Linki' : 'Telegram Channel / Group Link';
-      linkPlaceholder = 'https://t.me/kanaladi';
+      linkPlaceholder = 'https://t.me/ornek_kanal';
     } else if (platform === 'Spotify') {
       linkLabel = currentLanguage === 'TR' ? 'Spotify Parça / Profil Linki' : 'Spotify Track / Profile Link';
       linkPlaceholder = 'https://open.spotify.com/track/...';
@@ -518,24 +518,24 @@ export const ClientDashboard: React.FC = () => {
     } else if (platform === 'Kick') {
       if (isLive) {
         linkLabel = currentLanguage === 'TR' ? 'Kick Yayın Linki' : 'Kick Stream Link';
-        linkPlaceholder = 'https://kick.com/kanaladi';
+        linkPlaceholder = 'https://kick.com/ornek_kanal';
       } else if (isClip) {
         linkLabel = currentLanguage === 'TR' ? 'Kick Clip Linki' : 'Kick Clip Link';
-        linkPlaceholder = 'https://kick.com/kanaladi/clip/...';
+        linkPlaceholder = 'https://kick.com/ornek_kanal/clip/abc123';
       } else {
         linkLabel = currentLanguage === 'TR' ? 'Kick Kanal Linki' : 'Kick Channel Link';
-        linkPlaceholder = 'https://kick.com/kanaladi';
+        linkPlaceholder = 'https://kick.com/ornek_kanal';
       }
     } else if (platform === 'Twitch') {
       if (isLive) {
         linkLabel = currentLanguage === 'TR' ? 'Twitch Yayın Linki' : 'Twitch Stream Link';
-        linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+        linkPlaceholder = 'https://www.twitch.tv/ornek_kanal';
       } else if (isClip) {
         linkLabel = currentLanguage === 'TR' ? 'Twitch Clip Linki' : 'Twitch Clip Link';
-        linkPlaceholder = 'https://clips.twitch.tv/...';
+        linkPlaceholder = 'https://clips.twitch.tv/OrbekClipAdi';
       } else {
         linkLabel = currentLanguage === 'TR' ? 'Twitch Kanal Linki' : 'Twitch Channel Link';
-        linkPlaceholder = 'https://www.twitch.tv/kanaladi';
+        linkPlaceholder = 'https://www.twitch.tv/ornek_kanal';
       }
     } else if (platform === 'LinkedIn') {
       if (isEngagement) {
@@ -543,7 +543,7 @@ export const ClientDashboard: React.FC = () => {
         linkPlaceholder = 'https://www.linkedin.com/posts/...';
       } else {
         linkLabel = currentLanguage === 'TR' ? 'LinkedIn Profil Linki' : 'LinkedIn Profile Link';
-        linkPlaceholder = 'https://www.linkedin.com/in/kullaniciadi';
+        linkPlaceholder = 'https://www.linkedin.com/in/ornek-profil';
       }
     } else if (platform === 'Reddit') {
       linkLabel = currentLanguage === 'TR' ? 'Reddit Gönderi / Profil Linki' : 'Reddit Post / Profile Link';

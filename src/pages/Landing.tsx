@@ -1153,7 +1153,7 @@ export const Landing: React.FC = () => {
                         type="email"
                         required
                         className="w-full bg-[#121226] border border-white/10 rounded-xl py-3 px-4 text-white placeholder-gray-600 focus:outline-none focus:border-cyan-400"
-                        placeholder="örn: email@ornek.com"
+                        placeholder={currentLanguage === 'TR' ? 'E-posta Giriniz' : 'Enter your email'}
                         value={forgotEmail}
                         onChange={(e) => setForgotEmail(e.target.value)}
                       />
