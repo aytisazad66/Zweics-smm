@@ -178,6 +178,10 @@ export const ClientDashboard: React.FC = () => {
   }, []);
   // ─────────────────────────────────────────────────────────────────────────
 
+  // Detect actual physical device size — independent of Chrome "Request Desktop Site" mode
+  // window.screen.width reflects real hardware pixels (CSS), not the viewport Chrome fakes in desktop mode
+  const isMobileLayout = typeof window !== 'undefined' && window.screen.width < 1024;
+
   // Mobile navigation drawer state
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -864,7 +868,7 @@ export const ClientDashboard: React.FC = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-[#090918] text-[#e0e0ff] font-sans antialiased relative selection:bg-cyan-500/30 selection:text-white pb-20 lg:pb-0">
+    <div className={`min-h-screen bg-[#090918] text-[#e0e0ff] font-sans antialiased relative selection:bg-cyan-500/30 selection:text-white ${isMobileLayout ? 'pb-20' : 'pb-0'}`}>
 
       {/* Announcement Modal Popup */}
       {showAnnouncementPopup && announcementText && (
@@ -1057,7 +1061,7 @@ export const ClientDashboard: React.FC = () => {
       )}
 
       {/* 2. Floating Mobile Glassmorphism Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0e0e24]/90 backdrop-blur-md border-t border-white/5 flex items-center justify-around px-4 lg:hidden z-[1000] shadow-[0_-8px_24px_rgba(0,0,0,0.5)]">
+      <nav className={`fixed bottom-0 left-0 right-0 h-16 bg-[#0e0e24]/90 backdrop-blur-md border-t border-white/5 flex items-center justify-around px-4 z-[1000] shadow-[0_-8px_24px_rgba(0,0,0,0.5)] ${isMobileLayout ? '' : 'hidden'}`}>
         <button
           onClick={() => {
             setActiveTab('dashboard');
@@ -1178,10 +1182,10 @@ export const ClientDashboard: React.FC = () => {
       </header>
 
       {/* Primary grid container */}
-      <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8">
+      <div className={`max-w-7xl mx-auto px-4 md:px-8 py-6 md:py-8 grid gap-6 md:gap-8 ${isMobileLayout ? 'grid-cols-1' : 'grid-cols-12'}`}>
         
         {/* Left column visual cards / navigation map */}
-        <div className="col-span-1 lg:col-span-3 space-y-6 order-2 lg:order-1">
+        <div className={`space-y-6 ${isMobileLayout ? 'col-span-1 order-2' : 'col-span-3 order-1'}`}>
           
           {/* Cyber Wallet Card layout */}
           <div className="bg-[#121226] border border-cyan-500/15 rounded-3xl p-5 space-y-4 shadow-xl relative overflow-hidden group">
@@ -1239,7 +1243,7 @@ export const ClientDashboard: React.FC = () => {
           </div>
 
           {/* Tab buttons sidebar layout - Hidden on mobile, sticky bar utilized instead */}
-          <div className="bg-[#121226]/50 border border-white/5 rounded-3xl p-3 space-y-1.5 shadow-md hidden lg:block">
+          <div className={`bg-[#121226]/50 border border-white/5 rounded-3xl p-3 space-y-1.5 shadow-md ${isMobileLayout ? 'hidden' : ''}`}>
             {[
               { id: 'dashboard', labelTR: 'Kullanıcı Özet Paneli', labelEN: 'Account Console', icon: Award },
               { id: 'new-order', labelTR: 'Yeni Sipariş Gir', labelEN: 'New SMM Order', icon: PlusCircle },
@@ -1298,7 +1302,7 @@ export const ClientDashboard: React.FC = () => {
         </div>
 
         {/* Right column active panels stream */}
-        <div className="lg:col-span-9 space-y-6">
+        <div className={`space-y-6 ${isMobileLayout ? 'col-span-1' : 'col-span-9'}`}>
           
           {/* TAB: Premium Dashboard Overview */}
           {activeTab === 'dashboard' && (
